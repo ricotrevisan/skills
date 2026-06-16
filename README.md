@@ -17,7 +17,7 @@ Adapted from Aaron Shepherd's ([GrowthFlare](https://www.youtube.com/@AaronxShep
 To use a skill locally with Claude Code, clone the repo and symlink the skill into your personal skills directory:
 
 ```bash
-git clone git@github.com:RicoTrevisan/skills.git
+git clone git@github.com:ricotrevisan/skills.git
 ln -s "$PWD/skills/skills/offer-to-cold-email" ~/.claude/skills/offer-to-cold-email
 ```
 
