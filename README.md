@@ -6,6 +6,10 @@ Each skill lives in its own directory under [`skills/`](skills/) and contains a 
 
 ## Skills
 
+### [tidewave](skills/tidewave/SKILL.md)
+
+Use the [Tidewave](https://tidewave.ai) MCP tools (v0.8+) against a running Phoenix dev server without the trial-and-error: help-first `browser_eval`, no guessed tool names, and a triage table for the common failure states. Distilled from real agent sessions where every one of these mistakes was made at least once.
+
 ### [offer-to-cold-email](skills/offer-to-cold-email/SKILL.md)
 
 Turn a service — coaching, agency, consulting, or productized — into punchy front-end offers and short cold emails that actually start conversations.
