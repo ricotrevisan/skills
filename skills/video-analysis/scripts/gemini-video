@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: gemini-video VIDEO [PROMPT]
+
+Submit a compact, full-duration copy of VIDEO to Gemini, including audio.
+Requires GEMINI_API_KEY, ffmpeg, and python3.
+
+Optional environment variables:
+  GEMINI_VIDEO_MODEL         Gemini model (default: gemini-3.6-flash)
+  GEMINI_VIDEO_FPS           Fallback video frame rate (default: 10)
+  GEMINI_VIDEO_HEIGHT        Maximum fallback height (default: 720)
+  GEMINI_VIDEO_CRF           H.264 quality value (default: 30)
+  GEMINI_VIDEO_INLINE_LIMIT  Raw video cutoff for inline requests (default: 14680064)
+EOF
+  exit "${1:-2}"
+}
+
+[[ ${1:-} == "-h" || ${1:-} == "--help" ]] && usage 0
+[[ $# -ge 1 && $# -le 2 ]] || usage
+
+video=$1
+prompt=${2:-"Watch this complete recording. Describe it chronologically with timestamps, including exact actions, visible state changes, audio when relevant, unexpected behavior, and plausible root-cause clues. Separate direct observations from inference."}
+model=${GEMINI_VIDEO_MODEL:-gemini-3.6-flash}
+fps=${GEMINI_VIDEO_FPS:-10}
+height=${GEMINI_VIDEO_HEIGHT:-720}
+crf=${GEMINI_VIDEO_CRF:-30}
+# The raw cutoff leaves room for base64 expansion, the prompt, and JSON under
+# Gemini's 20 MiB inline-request limit.
+inline_limit=${GEMINI_VIDEO_INLINE_LIMIT:-14680064}
+
+[[ -f "$video" ]] || { echo "Video not found: $video" >&2; exit 1; }
+[[ -n "${GEMINI_API_KEY:-}" ]] || { echo "GEMINI_API_KEY is not set" >&2; exit 1; }
+command -v ffmpeg >/dev/null || { echo "ffmpeg is required" >&2; exit 1; }
+command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+compact="$work/video.mp4"
+
+# Preserve the complete timeline and optional audio while reducing upload size.
+# The media parser does not need access to the API credential.
+env -u GEMINI_API_KEY ffmpeg -hide_banner -loglevel error -y \
+  -i "$video" \
+  -map 0:v:0 -map '0:a:0?' \
+  -vf "fps=${fps},scale=1280:${height}:force_original_aspect_ratio=decrease:force_divisible_by=2" \
+  -c:v libx264 -preset veryfast -crf "$crf" -pix_fmt yuv420p \
+  -c:a aac -b:a 64k -movflags +faststart \
+  "$compact"
+
+GEMINI_VIDEO_FILE="$compact" \
+GEMINI_VIDEO_PROMPT="$prompt" \
+GEMINI_VIDEO_MODEL="$model" \
+GEMINI_VIDEO_INLINE_LIMIT="$inline_limit" \
+python3 <<'PY'
+import base64
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+
+video_path = os.environ["GEMINI_VIDEO_FILE"]
+prompt = os.environ["GEMINI_VIDEO_PROMPT"]
+model = os.environ["GEMINI_VIDEO_MODEL"]
+inline_limit = int(os.environ["GEMINI_VIDEO_INLINE_LIMIT"])
+api_key = os.environ["GEMINI_API_KEY"]
+api_root = "https://generativelanguage.googleapis.com"
+api_headers = {"x-goog-api-key": api_key}
+uploaded_name = None
+
+
+def request_json(url, *, data=None, headers=None, method=None, timeout=300):
+    merged_headers = dict(api_headers)
+    if headers:
+        merged_headers.update(headers)
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers=merged_headers,
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read()
+            return json.loads(body) if body else {}, response.headers
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        print(f"Gemini HTTP {error.code}: {detail}", file=sys.stderr)
+        raise SystemExit(1)
+    except Exception as error:
+        print(f"Gemini request failed: {error}", file=sys.stderr)
+        raise SystemExit(1)
+
+
+with open(video_path, "rb") as video_file:
+    video_bytes = video_file.read()
+
+try:
+    if len(video_bytes) <= inline_limit:
+        video_part = {
+            "inline_data": {
+                "mime_type": "video/mp4",
+                "data": base64.b64encode(video_bytes).decode("ascii"),
+            }
+        }
+    else:
+        metadata = json.dumps(
+            {"file": {"display_name": "gemini-video fallback"}}
+        ).encode("utf-8")
+        _, start_headers = request_json(
+            f"{api_root}/upload/v1beta/files",
+            data=metadata,
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Upload-Protocol": "resumable",
+                "X-Goog-Upload-Command": "start",
+                "X-Goog-Upload-Header-Content-Length": str(len(video_bytes)),
+                "X-Goog-Upload-Header-Content-Type": "video/mp4",
+            },
+            method="POST",
+        )
+        upload_url = start_headers.get("X-Goog-Upload-URL")
+        if not upload_url:
+            print("Gemini did not return a resumable upload URL", file=sys.stderr)
+            raise SystemExit(1)
+
+        uploaded, _ = request_json(
+            upload_url,
+            data=video_bytes,
+            headers={
+                "Content-Type": "video/mp4",
+                "Content-Length": str(len(video_bytes)),
+                "X-Goog-Upload-Offset": "0",
+                "X-Goog-Upload-Command": "upload, finalize",
+            },
+            method="POST",
+        )
+        file_info = uploaded.get("file", {})
+        uploaded_name = file_info.get("name")
+        file_uri = file_info.get("uri")
+        if not uploaded_name or not file_uri:
+            print(json.dumps(uploaded, indent=2), file=sys.stderr)
+            raise SystemExit(1)
+
+        deadline = time.monotonic() + 300
+        while True:
+            status, _ = request_json(f"{api_root}/v1beta/{uploaded_name}")
+            state = status.get("state")
+            if state == "ACTIVE":
+                break
+            if state == "FAILED":
+                print(json.dumps(status, indent=2), file=sys.stderr)
+                raise SystemExit(1)
+            if time.monotonic() >= deadline:
+                print(f"Gemini file processing timed out in state {state}", file=sys.stderr)
+                raise SystemExit(1)
+            time.sleep(2)
+
+        video_part = {
+            "file_data": {
+                "mime_type": "video/mp4",
+                "file_uri": file_uri,
+            }
+        }
+
+    payload = {
+        "contents": [{"parts": [video_part, {"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 8192,
+        },
+    }
+    result, _ = request_json(
+        f"{api_root}/v1beta/models/{model}:generateContent",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        candidate = result["candidates"][0]
+        parts = candidate["content"]["parts"]
+    except (KeyError, IndexError, TypeError):
+        print(json.dumps(result, indent=2), file=sys.stderr)
+        raise SystemExit(1)
+
+    finish_reason = candidate.get("finishReason")
+    if finish_reason != "STOP":
+        print(
+            f"Gemini response was incomplete (finishReason={finish_reason})",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    text = "\n".join(part.get("text", "") for part in parts).strip()
+    if not text:
+        print(json.dumps(result, indent=2), file=sys.stderr)
+        raise SystemExit(1)
+    print(text)
+finally:
+    if uploaded_name:
+        try:
+            request_json(
+                f"{api_root}/v1beta/{uploaded_name}",
+                method="DELETE",
+                timeout=30,
+            )
+        except SystemExit:
+            pass
+PY
