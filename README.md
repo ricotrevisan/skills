@@ -20,21 +20,31 @@ Turn a service — coaching, agency, consulting, or productized — into punchy 
 
 Adapted from Aaron Shepherd's ([GrowthFlare](https://www.youtube.com/@AaronxShepherd)) video ["Give me 24 min and I'll make your cold emails impossible to ignore"](https://www.youtube.com/watch?v=N5ORVjBPlcg). All credit for the underlying ideas goes to him; this skill simply packages them for reuse.
 
+### [bubble-plugin-development](skills/bubble-plugin-development/SKILL.md)
+
+Workflow for Bubble.io plugin repos that use Pled (plugin source sync) and Buildprint (dev app): the two-code-piles layout, the Pled pull/push/watch loop, runtime bundle releases, Buildprint branching, and how to verify changes against the real Bubble UI. Plugin-specific facts stay in each repo's `AGENTS.md`.
+
+## Matt Pocock's skills
+
+Vendored from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT), promoted `engineering` and `productivity` buckets:
+
+[ask-matt](skills/ask-matt/SKILL.md), [code-review](skills/code-review/SKILL.md), [codebase-design](skills/codebase-design/SKILL.md), [diagnosing-bugs](skills/diagnosing-bugs/SKILL.md), [domain-modeling](skills/domain-modeling/SKILL.md), [grill-me](skills/grill-me/SKILL.md), [grill-with-docs](skills/grill-with-docs/SKILL.md), [grilling](skills/grilling/SKILL.md), [handoff](skills/handoff/SKILL.md), [implement](skills/implement/SKILL.md), [improve-codebase-architecture](skills/improve-codebase-architecture/SKILL.md), [prototype](skills/prototype/SKILL.md), [research](skills/research/SKILL.md), [resolving-merge-conflicts](skills/resolving-merge-conflicts/SKILL.md), [setup-matt-pocock-skills](skills/setup-matt-pocock-skills/SKILL.md), [tdd](skills/tdd/SKILL.md), [teach](skills/teach/SKILL.md), [to-questionnaire](skills/to-questionnaire/SKILL.md), [to-spec](skills/to-spec/SKILL.md), [to-tickets](skills/to-tickets/SKILL.md), [triage](skills/triage/SKILL.md), [wait-what](skills/wait-what/SKILL.md), [wayfinder](skills/wayfinder/SKILL.md), [wizard](skills/wizard/SKILL.md), [writing-for-agents](skills/writing-for-agents/SKILL.md)
+
 ## Install
 
-Clone the repo, then symlink a skill into the directory your agent client loads:
+Clone the repo, then symlink every skill into the directories your agent clients load:
 
 ```bash
 git clone git@github.com:ricotrevisan/skills.git
 cd skills
 
-# pi and shared agent clients
+# shared agent skill dir (opencode loads this automatically; Claude Code can too)
 mkdir -p ~/.agents/skills
-ln -s "$PWD/skills/video-analysis" ~/.agents/skills/video-analysis
+for d in skills/*/; do ln -sfn "$PWD/$d" ~/.agents/skills/"$(basename "$d")"; done
 
-# Claude Code
+# Claude Code (optional if it already reads ~/.agents/skills)
 mkdir -p ~/.claude/skills
-ln -s "$PWD/skills/offer-to-cold-email" ~/.claude/skills/offer-to-cold-email
+for d in skills/*/; do ln -sfn "$PWD/$d" ~/.claude/skills/"$(basename "$d")"; done
 ```
 
 ## License
