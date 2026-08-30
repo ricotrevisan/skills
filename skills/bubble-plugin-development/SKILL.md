@@ -70,6 +70,11 @@ buildprint apply
   assigns `<id>` when the branch is created.
 - Create as many dev pages as needed. When done: merge the branch into main,
   delete dev pages you created, and remove the branch.
+- **Clean up after yourself.** Finishing a ticket means: merge the work,
+  delete the Bubble branch (via the Bubble editor if no CLI command exists),
+  delete the dev pages you created, and remove the local branch workspace
+  (e.g. `~/tiptap-plugin/<branch>/`). Never leave spent branches, pages, or
+  local workspaces behind.
 
 ## Verifying changes
 
