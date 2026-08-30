@@ -24,12 +24,6 @@ Adapted from Aaron Shepherd's ([GrowthFlare](https://www.youtube.com/@AaronxShep
 
 Workflow for Bubble.io plugin repos that use Pled (plugin source sync) and Buildprint (dev app): the two-code-piles layout, the Pled pull/push/watch loop, runtime bundle releases, Buildprint branching, and how to verify changes against the real Bubble UI. Plugin-specific facts stay in each repo's `AGENTS.md`.
 
-## Matt Pocock's skills
-
-Vendored from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT), promoted `engineering` and `productivity` buckets:
-
-[ask-matt](skills/ask-matt/SKILL.md), [code-review](skills/code-review/SKILL.md), [codebase-design](skills/codebase-design/SKILL.md), [diagnosing-bugs](skills/diagnosing-bugs/SKILL.md), [domain-modeling](skills/domain-modeling/SKILL.md), [grill-me](skills/grill-me/SKILL.md), [grill-with-docs](skills/grill-with-docs/SKILL.md), [grilling](skills/grilling/SKILL.md), [handoff](skills/handoff/SKILL.md), [implement](skills/implement/SKILL.md), [improve-codebase-architecture](skills/improve-codebase-architecture/SKILL.md), [prototype](skills/prototype/SKILL.md), [research](skills/research/SKILL.md), [resolving-merge-conflicts](skills/resolving-merge-conflicts/SKILL.md), [setup-matt-pocock-skills](skills/setup-matt-pocock-skills/SKILL.md), [tdd](skills/tdd/SKILL.md), [teach](skills/teach/SKILL.md), [to-questionnaire](skills/to-questionnaire/SKILL.md), [to-spec](skills/to-spec/SKILL.md), [to-tickets](skills/to-tickets/SKILL.md), [triage](skills/triage/SKILL.md), [wait-what](skills/wait-what/SKILL.md), [wayfinder](skills/wayfinder/SKILL.md), [wizard](skills/wizard/SKILL.md), [writing-for-agents](skills/writing-for-agents/SKILL.md)
-
 ## Install
 
 Clone the repo, then symlink every skill into the directories your agent clients load:
