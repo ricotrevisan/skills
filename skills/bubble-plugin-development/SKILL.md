@@ -76,6 +76,28 @@ buildprint apply
   (e.g. `~/tiptap-plugin/<branch>/`). Never leave spent branches, pages, or
   local workspaces behind.
 
+## Deleting branches via the Bubble editor
+
+The CLI has no branch-delete command. Delete branches through the editor UI
+with browser automation (Playwright + the editor cookies in `BUBBLE_COOKIE`):
+
+```sh
+node scripts/delete-bubble-branch.js <branch-name> [more names...]
+```
+
+Flow it drives: open the editor at `https://bubble.io/page?id=<app>&tab=Design`
+→ open the branch panel (top-left selector) → click the branch row and wait
+for it to load → open the panel again → "…" menu → **Delete** → type the
+branch name in the confirm box → click the red **Delete**.
+
+Notes:
+
+- Coordinate clicks assume the script's 1700×1050 viewport; verify with the
+  screenshots it drops if the editor UI changes.
+- The `httpCredentials` (run-mode basic auth) and app id are hardcoded for
+  `tiptap-plugin` — adjust per app.
+- Requires `npm i playwright` and a Chromium build under `~/.cache/ms-playwright`.
+
 ## Verifying changes
 
 - **No Playwright MCP. No `TEST_URL`.** Open the real run-mode demo URL in
