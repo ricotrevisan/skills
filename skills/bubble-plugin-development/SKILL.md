@@ -63,8 +63,8 @@ cd /home/rico/<dir>/33-pie-chart
 buildprint apply
 ```
 
-- Bubble subscriptions allow only **10 branches** — warn when approaching the
-  limit.
+- Bubble allows **9 branch copies under `test`** (`test` + 9; 10 app
+  versions in total) — warn when approaching the limit.
 - Share links look like
   `https://<user>:<pass>@<app>.bubbleapps.io/version-<id>/<page>`; Bubble
   assigns `<id>` when the branch is created.
