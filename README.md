@@ -24,6 +24,8 @@ Adapted from Aaron Shepherd's ([GrowthFlare](https://www.youtube.com/@AaronxShep
 
 Workflow for Bubble.io plugin repos that use Pled (plugin source sync) and Buildprint (dev app): the two-code-piles layout, the Pled pull/push/watch loop, runtime bundle releases, Buildprint branching, and how to verify changes against the real Bubble UI. Plugin-specific facts stay in each repo's `AGENTS.md`.
 
+Includes a credential-safe setup preflight plus focused references for demo-page design and destructive Bubble branch cleanup.
+
 ## Install
 
 Clone the repo, then symlink every skill into the directories your agent clients load:
