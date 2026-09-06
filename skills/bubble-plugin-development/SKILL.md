@@ -1,114 +1,102 @@
 ---
 name: bubble-plugin-development
-description: Use when working in a Bubble.io plugin repo (~/bubble-plugins/*) that uses Pled for plugin sync and Buildprint for the dev app. Covers the Pled workflow, the two-code-piles layout, secure keys, renderer bundle builds, branching, and how to verify changes against the real Bubble UI.
+description: Develop, debug, test, and release Bubble.io plugins in `~/bubble-plugins/*` using Pled for plugin source and Buildprint for the dev app. Use for plugin elements or actions, renderer bundles, Bubble branches, demo pages, and preview verification.
 ---
 
 # Bubble plugin development
 
-Workflow for Bubble.io plugin repos that use **Pled** (plugin source sync to
-Bubble) and **Buildprint** (dev app hosting and branching). Each plugin repo's
-`AGENTS.md` holds the plugin-specific facts (app name, demo page, login,
-renderer details); this skill holds the shared workflow. Read the repo's
-`AGENTS.md` first.
+Use this workflow for Bubble plugin repos that pair **Pled** with a
+Buildprint-hosted development app. Read the target repo's `AGENTS.md` first;
+it owns the plugin id, app name, demo page, login, build commands, and any
+renderer-specific rules. This skill owns the shared operating procedure.
 
-## Two code piles
+The workflow requires Bash, Node.js/npm, Pled, Buildprint CLI,
+`BUBBLE_COOKIE`, and a plugin repo with `AGENTS.md`.
 
-- `src/` — decoded Bubble plugin source. Pled uploads this. Never hand-edit
-  anything outside `src/` and expect it to reach Bubble.
-- `lib/` — separately built runtime bundle (renderer, Tiptap runtime, etc.),
-  versioned and uploaded on release.
+## Preflight
 
-## Pled (plugin sync)
-
-`BUBBLE_COOKIE` is already in the shell. Never write it to the repo.
+Run the bundled preflight from the plugin repo before relying on the toolchain:
 
 ```sh
-pled status
-pled pull      # first, if status says "No baseline"
-pled push
-pled watch     # auto-push src/ changes
+skill_dir="${AGENT_SKILL_DIR:-$HOME/.agents/skills/bubble-plugin-development}"
+"$skill_dir/scripts/check-setup" "$PWD"
 ```
 
-- If `pled status` reports a divergence, inspect both sides and choose the
-  safe direction. Preserve intentional local changes.
-- In `src/elements/*/initialize.js` / `update.js`, omit Bubble's outer
-  `function(...)` — Pled adds it. Do not wrap the file yourself.
-- Signatures: `initialize.js` → `instance`, `context`; `update.js` →
-  `instance`, `properties`, `context`.
-- `secure` shared keys are server-only. Elements never see them.
+Use `--live` when a task needs Bubble access. It adds read-only `pled status`
+and `buildprint project list` probes. A passing local preflight is not proof of
+remote access; a passing live preflight is.
 
-## Runtime bundle (lib)
+If preflight fails, report each missing command, credential, or repo marker.
+Set up only what the user asked to change. Never print `BUBBLE_COOKIE`, copy it
+into a repo, or expose Buildprint authentication files.
 
-- Respect the pinned Node version (`lib/.node-version` where present).
-- Build from `lib/`: `npm ci`, then build/test per the repo.
-- Release flow: copy the bundle to a **unique versioned filename**, then
-  `pled upload`, then update the element's `headers.html` (or equivalent) to
-  the new CDN URL before pushing the plugin. Never upload a stale or generic
-  filename.
+## Sources of truth
 
-## Dev app (Buildprint)
+- `src/` is decoded Bubble plugin source. Pled uploads it.
+- `lib/` is a separately built runtime bundle when the plugin has one.
+- The development app is a test surface, not a substitute for fixing shared
+  plugin behavior in `src/` or `lib/`.
+- The repo's `AGENTS.md` resolves plugin-specific facts. Stop if its app name
+  does not exactly match the Buildprint project you intend to use.
 
-The plugin points at a Buildprint-hosted Bubble app as its test app. See the
-repo's `AGENTS.md` for the app name, login, and demo page.
+In `src/elements/*/initialize.js` and `update.js`, omit Bubble's outer
+`function(...)`; Pled adds it. The decoded signatures are:
 
-For new work on a ticket, create a branch (short name, include the issue
-number):
+- `initialize.js`: `instance`, `context`
+- `update.js`: `instance`, `properties`, `context`
+
+Bubble `secure` shared keys are server-only; element code never receives them.
+
+## Change workflow
+
+1. Inspect `AGENTS.md`, `git status`, `pled status`, and the relevant source
+   before editing. If Pled reports divergence, understand both sides and
+   preserve intentional local and remote work.
+2. For development-app changes, use a short dedicated Bubble branch derived
+   from `test`. Never edit `test` or `live` directly. Bubble allows nine branch
+   copies under `test`; check capacity before creating one.
+3. Change plugin behavior in `src/`. Change a separately bundled runtime in
+   `lib/`, respecting its pinned Node version and repo-specific build commands.
+4. Run the narrow tests first, then the repo's full relevant build/test suite.
+5. When a runtime bundle changed, create a uniquely versioned asset, upload it,
+   update the plugin header to that exact URL, and push the plugin only after
+   the user has authorized the external changes.
+6. Apply development-app changes through Buildprint only after checking the
+   target branch and creating a savepoint or equivalent rollback point.
+7. Verify the exact Bubble branch in real run mode. Use real pointer/keyboard
+   interaction; synthetic JavaScript events do not prove Bubble click states.
+
+Typical branch setup:
 
 ```sh
-# ticket: 33: implement Pie Chart element
-buildprint branch create <app> 33-pie-chart --from test
-buildprint project clone <app> --branch 33-pie-chart --dir /home/rico/<dir>
-cd /home/rico/<dir>/33-pie-chart
-# edit pages, then:
-buildprint apply
+buildprint branch create <app> <issue>-<slug> --from test
+buildprint project clone <app> --branch <issue>-<slug> --dir <workspace-root>
 ```
 
-- Bubble allows **9 branch copies under `test`** (`test` + 9; 10 app
-  versions in total) — warn when approaching the limit.
-- Share links look like
-  `https://<user>:<pass>@<app>.bubbleapps.io/version-<id>/<page>`; Bubble
-  assigns `<id>` when the branch is created.
-- Create as many dev pages as needed. When done: merge the branch into main,
-  delete dev pages you created, and remove the branch.
-- **Clean up after yourself.** Finishing a ticket means: merge the work,
-  delete the Bubble branch (via the Bubble editor if no CLI command exists),
-  delete the dev pages you created, and remove the local branch workspace
-  (e.g. `~/tiptap-plugin/<branch>/`). Never leave spent branches, pages, or
-  local workspaces behind.
+Treat `pled pull`, `pled push`, `pled upload`, `buildprint branch create`,
+`buildprint apply`, merges, releases, and branch deletion as mutations. Verify
+the exact target and rollback before each. Feature-branch work that is plainly
+inside an implementation request needs no extra confirmation; merges,
+releases, branch deletion, and any direct change to `test` or `live` require
+explicit confirmation immediately before they run.
 
-## Deleting branches via the Bubble editor
+## Verification and completion
 
-The CLI has no branch-delete command. Delete branches through the editor UI
-with browser automation (Playwright + the editor cookies in `BUBBLE_COOKIE`):
+A plugin task is complete only when all applicable checks pass:
 
-```sh
-node scripts/delete-bubble-branch.js <branch-name> [more names...]
-```
+- The code diff contains only intended plugin, bundle, or dev-app changes.
+- Relevant tests and builds pass.
+- After any approved push, `pled status` reports the expected remote state.
+- Buildprint changes exist on the intended feature branch and its diff is
+  understood.
+- The affected behavior was exercised in the exact branch's real preview,
+  including the failure case that motivated the change.
+- The final response names the tested branch/version and returns its exact
+  preview URL, preserving its path and query string.
+- Merge and cleanup happen only when the user requested them. Then remove only
+  task-created branches, demo pages, and local workspaces, and verify removal.
 
-Flow it drives: open the editor at `https://bubble.io/page?id=<app>&tab=Design`
-→ open the branch panel (top-left selector) → click the branch row and wait
-for it to load → open the panel again → "…" menu → **Delete** → type the
-branch name in the confirm box → click the red **Delete**.
-
-Notes:
-
-- Coordinate clicks assume the script's 1700×1050 viewport; verify with the
-  screenshots it drops if the editor UI changes.
-- The `httpCredentials` (run-mode basic auth) and app id are hardcoded for
-  `tiptap-plugin` — adjust per app.
-- Requires `npm i playwright` and a Chromium build under `~/.cache/ms-playwright`.
-
-## Verifying changes
-
-- **No Playwright MCP. No `TEST_URL`.** Open the real run-mode demo URL in
-  browser preview tools, or use `buildprint screenshot` against it.
-- **Do not fake clicks with injected JavaScript.** Bubble click states do not
-  update from synthetic events. Click the real UI.
-- The browser may ignore URL credentials and show a login popup — that is
-  expected.
-
-## Demo page
-
-Keep a demo page that shows off the plugin: simple user-facing language,
-written for a medior Bubble developer. If the plugin points at the marketplace
-version, the demo reflects the published version, not local changes.
+When creating or substantially redesigning a demo page, read
+[references/demo-page.md](references/demo-page.md). When the user asks to merge
+or remove a Bubble branch, read
+[references/branch-cleanup.md](references/branch-cleanup.md) before acting.

@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+
+set -u
+
+live=false
+repo_path="${PWD}"
+
+usage() {
+  printf 'Usage: %s [--live] [plugin-repo]\n' "$0"
+}
+
+while (($#)); do
+  case "$1" in
+    --live)
+      live=true
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --*)
+      printf 'Unknown option: %s\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      repo_path="$1"
+      ;;
+  esac
+  shift
+done
+
+failures=0
+
+ok() {
+  printf 'ok      %s\n' "$1"
+}
+
+missing() {
+  printf 'missing %s\n' "$1"
+  failures=$((failures + 1))
+}
+
+for command_name in pled buildprint node npm; do
+  if command -v "$command_name" >/dev/null 2>&1; then
+    ok "$command_name ($(command -v "$command_name"))"
+  else
+    missing "$command_name command"
+  fi
+done
+
+if [[ -n "${BUBBLE_COOKIE:-}" ]]; then
+  ok 'BUBBLE_COOKIE is set'
+else
+  missing 'BUBBLE_COOKIE'
+fi
+
+if [[ -d "$repo_path" ]]; then
+  ok "plugin repo exists ($repo_path)"
+else
+  missing "plugin repo ($repo_path)"
+fi
+
+for marker in AGENTS.md .plugin_id src; do
+  if [[ -e "$repo_path/$marker" ]]; then
+    ok "repo marker $marker"
+  else
+    missing "repo marker $marker"
+  fi
+done
+
+if [[ "$live" == true && "$failures" -eq 0 ]]; then
+  printf '\nLive read-only probes:\n'
+  if (cd "$repo_path" && pled status); then
+    ok 'Pled remote status'
+  else
+    missing 'Pled remote status'
+  fi
+
+  if buildprint project list; then
+    ok 'Buildprint project access'
+  else
+    missing 'Buildprint project access'
+  fi
+fi
+
+if ((failures)); then
+  printf '\nPreflight failed: %d missing or failing requirement(s).\n' "$failures" >&2
+  exit 1
+fi
+
+printf '\nPreflight passed.\n'
