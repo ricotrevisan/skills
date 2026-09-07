@@ -26,6 +26,10 @@ Workflow for Bubble.io plugin repos that use Pled (plugin source sync) and Build
 
 Includes a credential-safe setup preflight plus focused references for demo-page design and destructive Bubble branch cleanup.
 
+### [bubble-plugin-dx](skills/bubble-plugin-dx/SKILL.md)
+
+Grade Bubble plugin element usability for junior and senior builders. Includes an evidence-based DX rubric, audience weights, ease-versus-power guidance, and usability validation tasks.
+
 ## Install
 
 Clone the repo, then symlink every skill into the directories your agent clients load:
