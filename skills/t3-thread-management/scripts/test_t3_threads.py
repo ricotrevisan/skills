@@ -1,10 +1,13 @@
 import argparse
 import copy
+import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from t3_threads import start
+from t3_threads import run_remote, start
 
 
 class FakeClient:
@@ -96,6 +99,69 @@ class HandoffTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'together'):
             start(client, self.args)
         self.assertEqual(client.calls, [])
+
+    def remote_args(self):
+        return argparse.Namespace(**vars(self.args), host='office', base_dir=None,
+            cli=None, node=None, allow_non_loopback=False, command='start', prompt=None)
+
+    def test_remote_transfer_preserves_prompt_and_target_paths_without_shell_interpolation(self):
+        args = self.remote_args()
+        text = "say 'hello'\n$(touch /tmp/unwanted) `whoami` $HOME"
+        Path(args.prompt_file).write_text(text)
+        args.workspace = '/remote/project with spaces'
+        args.receipt = '/remote/receipt.json'
+        with patch('t3_threads.subprocess.run') as run:
+            run.return_value = subprocess.CompletedProcess([], 0, '{"ok": true}', '')
+            self.assertEqual(run_remote(args), {'ok': True})
+        command = run.call_args.args[0]
+        self.assertEqual(command[-2], 'office')
+        self.assertIn('BatchMode=yes', command)
+        self.assertNotIn(text, ' '.join(command))
+        payload = json.loads(run.call_args.kwargs['input'])
+        remote = payload['args']
+        self.assertEqual(remote[remote.index('--prompt') + 1], text)
+        self.assertIn('/remote/project with spaces', remote)
+        self.assertIn('/remote/receipt.json', remote)
+        self.assertNotIn('--host', remote)
+        self.assertNotIn('--base-dir', remote)
+        self.assertNotIn('--prompt-file', remote)
+        # Execute the actual SSH loader locally with harmless code to verify that
+        # its stdin protocol preserves arguments without interpreting task text.
+        payload['code'] = 'import json,sys; print(json.dumps(sys.argv[1:]))'
+        out = subprocess.run(command[-1], shell=True, input=json.dumps(payload),
+                             text=True, capture_output=True, check=True)
+        self.assertEqual(json.loads(out.stdout), remote)
+
+    def test_remote_inline_prompt_and_destination_overrides(self):
+        args = self.remote_args()
+        args.prompt_file = None
+        args.prompt = 'say hello'
+        args.base_dir = '/Users/rico/.t3code'
+        args.cli = '/remote/bin.ts'
+        args.node = '/remote/node'
+        args.allow_non_loopback = True
+        with patch('t3_threads.subprocess.run') as run:
+            run.return_value = subprocess.CompletedProcess([], 0, '{}', '')
+            run_remote(args)
+        remote = json.loads(run.call_args.kwargs['input'])['args']
+        self.assertEqual(remote[:7], ['--base-dir', args.base_dir, '--cli', args.cli,
+                                     '--node', args.node, '--allow-non-loopback'])
+        self.assertEqual(remote[-2:], ['--prompt', 'say hello'])
+
+    def test_remote_ssh_failure_propagates_without_retry(self):
+        with patch('t3_threads.subprocess.run') as run:
+            run.return_value = subprocess.CompletedProcess([], 255, '', 'Connection closed')
+            with self.assertRaisesRegex(RuntimeError, 'inspect the destination'):
+                run_remote(self.remote_args())
+            self.assertEqual(run.call_count, 1)
+
+    def test_remote_rejects_option_as_host(self):
+        args = self.remote_args()
+        args.host = '-oProxyCommand=bad'
+        with patch('t3_threads.subprocess.run') as run:
+            with self.assertRaises(ValueError):
+                run_remote(args)
+            run.assert_not_called()
 
 
 if __name__ == '__main__':

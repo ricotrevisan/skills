@@ -1,6 +1,6 @@
 ---
 name: t3-thread-management
-description: Create and start T3Code threads with task handoffs and isolated worktrees, or check their status, using the local server and CLI authentication. Use when the user asks to start a new T3 session or split work across T3 threads.
+description: Create and start T3Code threads locally or on another server over SSH, with task handoffs and isolated worktrees, or check their status. Use when the user asks to start a new T3 session, hand work to another server, or split work across T3 threads.
 ---
 
 # T3 thread management
@@ -10,6 +10,9 @@ with the T3 CLI, then call the running server's orchestration API. A missing MCP
 thread tool or `t3` executable on PATH does not establish that access is unavailable.
 `t3 app <path>` instead talks to a desktop app on the same machine; its failure
 does not rule out the headless route.
+For a direct CLI/API example without the helper, read
+[references/direct-api.md](references/direct-api.md). The native CLI has no prompt
+submission subcommand; do not invent a `t3 --prompt` or `t3 session create` flag.
 
 ## Prepare the handoff
 
@@ -31,6 +34,8 @@ Use the bundled standard-library Python helper. It discovers the server from
 `~/.t3/userdata/server-runtime.json` and checks PATH and `~/.t3/runtime/versions/`
 for a CLI. Override `--base-dir` or `--cli` when necessary; a built source checkout
 can be invoked with `--cli /path/to/apps/server/dist/bin.mjs`.
+Use `--node /path/to/node` if Node is absent from PATH. These connection options
+precede the `inspect`, `start`, or `status` subcommand.
 
 ```bash
 python3 <skill-dir>/scripts/t3_threads.py inspect
@@ -40,10 +45,12 @@ python3 <skill-dir>/scripts/t3_threads.py start \
   --workspace /absolute/project/root \
   --title 'Concrete task title' \
   --prompt-file /absolute/task.txt \
-  --receipt /absolute/task-thread.json
+--receipt /absolute/task-thread.json
 
 python3 <skill-dir>/scripts/t3_threads.py status --thread-id <new-thread-id>
 ```
+
+For a short task, replace `--prompt-file` with `--prompt 'say hello'`.
 
 For an existing project with a separate worktree, supply the original project root
 as `--workspace`, plus `--branch <branch>` and `--worktree /absolute/worktree`.
@@ -58,10 +65,47 @@ session, an active turn ID, or a completed turn/message). An accepted command al
 is not proof that the agent started. Report the project, thread title/ID, worktree,
 and observed status. If startup remains pending or fails, report it accurately.
 
+## Another server over SSH
+
+Put `--host office` before the subcommand. The helper streams its code and the
+prompt over SSH to Python 3 on the destination; no remote skill installation is
+required. SSH uses batch mode and the existing host-key policy. Configure SSH
+access when necessary rather than disabling host verification.
+
+```bash
+python3 <skill-dir>/scripts/t3_threads.py --host office inspect
+python3 <skill-dir>/scripts/t3_threads.py --host office start \
+  --source-thread <office-thread-id> \
+  --workspace /path/on/office/project \
+  --title 'Greeting' --prompt 'say hello' \
+  --receipt /path/on/office/greeting-thread.json
+```
+
+`--prompt-file` is read on the invoking machine and sent as text. Workspace,
+worktree, receipt, CLI, Node and base-directory paths belong to the destination.
+The destination uses its own T3CODE_HOME/default when `--base-dir` is omitted;
+the invoking machine's environment is not forwarded. Source thread IDs must exist
+on the destination: choose one from its `inspect` output. Authentication is issued
+and used there; tokens never travel back in the SSH payload or result.
+
+Prepare branches/worktrees on the destination before starting. The helper does
+not transfer repositories or uncommitted files. Describe needed files in the
+handoff and explicitly transfer them within the user's scope.
+
+An SSH disconnect can occur after a successful API write. The receipt lives on
+the destination; re-run with the same host, request and receipt to inspect it.
+Use `--host office status --thread-id <id>` to verify startup.
+
+If a machine uses a different layout, inspect its launcher/runtime file and pass
+the actual `--base-dir`, `--cli` and `--node`. Some servers bind only to a LAN or
+Tailnet IP. After verifying that the destination owns the runtime file's address,
+pass `--allow-non-loopback`; it uses that configured origin with redirects disabled.
+
 ## Failure recovery
 
-- Authentication stays in memory and expires after five minutes. The helper sends
-  it only to the loopback origin in the runtime file, with redirects disabled.
+- Authentication stays in memory and expires after five minutes. The helper uses
+  the loopback runtime origin by default, with redirects disabled. The explicit
+  non-loopback override is for a verified destination-owned server address.
 - After a timeout or error, inspect the receipt and server status. Keep the same
   IDs; do not delete the receipt and blindly retry. If creation/start did not land,
   inspect the current API contract before explicitly resuming that stage.

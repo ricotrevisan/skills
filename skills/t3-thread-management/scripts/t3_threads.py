@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 import urllib.error
@@ -21,7 +22,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def discover_cli(base, explicit=None):
+def discover_cli(base, explicit=None, node='node'):
     candidates = [Path(explicit).expanduser()] if explicit else []
     if not explicit:
         if found := shutil.which('t3'):
@@ -30,15 +31,15 @@ def discover_cli(base, explicit=None):
                              key=lambda p: p.stat().st_mtime, reverse=True)
     for path in candidates:
         if path.is_file():
-            if path.suffix in ('.mjs', '.js'):
-                return ['node', str(path)]
+            if path.suffix in ('.mjs', '.js', '.ts'):
+                return [node, str(path)]
             if os.access(path, os.X_OK):
                 return [str(path)]
     raise ValueError('No CLI found. Supply --cli with an installed t3 or built bin.mjs.')
 
 
 class Client:
-    def __init__(self, base, cli=None):
+    def __init__(self, base, cli=None, node='node', allow_non_loopback=False):
         runtime = json.loads((base / 'userdata/server-runtime.json').read_text())
         self.origin = runtime['origin'].rstrip('/')
         parsed = urllib.parse.urlsplit(self.origin)
@@ -47,10 +48,11 @@ class Client:
             loopback = host == 'localhost' or ipaddress.ip_address(host).is_loopback
         except ValueError:
             loopback = False
-        if (not loopback or parsed.scheme not in ('http', 'https') or
+        if ((not loopback and not allow_non_loopback) or not host or parsed.scheme not in ('http', 'https') or
                 parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path):
-            raise ValueError('Runtime origin must be a loopback HTTP(S) origin.')
-        result = subprocess.run(discover_cli(base, cli) + [
+            raise ValueError('Runtime origin must be loopback HTTP(S). For a verified local '
+                             'server bound to its LAN/Tailnet address, use --allow-non-loopback.')
+        result = subprocess.run(discover_cli(base, cli, node) + [
             'auth', 'session', 'issue', '--base-dir', str(base), '--ttl', '5m',
             '--label', 't3-thread-management', '--token-only'],
             text=True, capture_output=True, timeout=30)
@@ -91,7 +93,8 @@ def start(client, args):
     worktree = str(Path(args.worktree).expanduser().resolve(strict=True)) if args.worktree else None
     if bool(worktree) != bool(args.branch):
         raise ValueError('Supply --branch and --worktree together.')
-    prompt = Path(args.prompt_file).read_text(encoding='utf-8')
+    prompt = (Path(args.prompt_file).read_text(encoding='utf-8') if args.prompt_file
+              else args.prompt)
     if not prompt.strip() or not args.title.strip():
         raise ValueError('Prompt and title must be nonempty.')
     request = dict(workspace=workspace, worktree=worktree, branch=args.branch,
@@ -139,21 +142,68 @@ def start(client, args):
     return {'receipt': saved, 'thread': thread_status(client.snapshot(), saved['threadId'])}
 
 
+def run_remote(args):
+    """Stream code and the task over SSH; auth and receipts stay on the target."""
+    if not args.host or args.host.startswith('-') or any(c.isspace() for c in args.host):
+        raise ValueError('Use an SSH host alias or user@host, not SSH options.')
+    remote_args = []
+    for option in ('base_dir', 'cli', 'node'):
+        if value := getattr(args, option):
+            remote_args.extend(['--' + option.replace('_', '-'), value])
+    if args.allow_non_loopback:
+        remote_args.append('--allow-non-loopback')
+    remote_args.append(args.command)
+    if args.command == 'start':
+        prompt = (Path(args.prompt_file).read_text(encoding='utf-8') if args.prompt_file
+                  else args.prompt)
+        for option in ('source_thread', 'workspace', 'title', 'receipt', 'branch', 'worktree'):
+            if value := getattr(args, option):
+                remote_args.extend(['--' + option.replace('_', '-'), value])
+        remote_args.extend(['--prompt', prompt])
+    elif args.command == 'status':
+        remote_args.extend(['--thread-id', args.thread_id])
+    # Only this constant loader is interpreted by the remote shell. All user input
+    # travels as JSON on stdin, including quotes, newlines, and shell metacharacters.
+    loader = ('import json,sys; p=json.load(sys.stdin); '
+              'sys.argv=["t3_threads.py"]+p["args"]; '
+              'exec(compile(p["code"],"t3_threads.py","exec"),'
+              '{"__name__":"__main__"})')
+    payload = json.dumps({'code': Path(__file__).read_text(), 'args': remote_args})
+    result = subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10',
+                             '--', args.host, 'python3 -c ' + shlex.quote(loader)],
+                            input=payload, text=True, capture_output=True, timeout=300)
+    if result.returncode:
+        raise RuntimeError('Remote invocation failed; inspect the destination receipt/status '
+                           'before retrying.\n' + result.stderr.strip())
+    return json.loads(result.stdout)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--base-dir', default=os.environ.get('T3CODE_HOME', '~/.t3'))
+    parser.add_argument('--base-dir', help='T3 data directory on the destination')
     parser.add_argument('--cli', help='Installed t3 executable or built bin.mjs')
+    parser.add_argument('--node', help='Node executable for a JS/TS CLI, useful over SSH')
+    parser.add_argument('--allow-non-loopback', action='store_true',
+                        help='Trust the runtime file origin after verifying this machine owns it')
+    parser.add_argument('--host', help='SSH destination; requires Python 3 and running T3 there')
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('inspect')
     status = commands.add_parser('status')
     status.add_argument('--thread-id', required=True)
     create = commands.add_parser('start')
-    for name in ('source-thread', 'workspace', 'title', 'prompt-file', 'receipt'):
+    for name in ('source-thread', 'workspace', 'title', 'receipt'):
         create.add_argument('--' + name, required=True)
+    prompt = create.add_mutually_exclusive_group(required=True)
+    prompt.add_argument('--prompt-file', help='UTF-8 task file on the invoking machine')
+    prompt.add_argument('--prompt', help='Inline task text')
     create.add_argument('--branch')
     create.add_argument('--worktree')
     args = parser.parse_args()
-    client = Client(Path(args.base_dir).expanduser().resolve(), args.cli)
+    if args.host:
+        print(json.dumps(run_remote(args), indent=2))
+        return
+    base = args.base_dir or os.environ.get('T3CODE_HOME', '~/.t3')
+    client = Client(Path(base).expanduser().resolve(), args.cli, args.node or 'node', args.allow_non_loopback)
     if args.command == 'start':
         result = start(client, args)
     elif args.command == 'status':
