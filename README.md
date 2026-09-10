@@ -6,6 +6,12 @@ Each skill lives in its own directory under [`skills/`](skills/) and contains a 
 
 ## Skills
 
+### [t3-thread-management](skills/t3-thread-management/SKILL.md)
+
+Start T3Code threads with complete task handoffs and prepared worktrees through
+the local server. Includes a Python helper for CLI authentication, project/thread
+creation, status verification, and receipts that prevent blind duplicate retries.
+
 ### [video-analysis](skills/video-analysis/SKILL.md)
 
 Watch, review, or diagnose videos with Gemini full-duration video input. Distinguishes model video input from client-side frame extraction and includes a compact full-video fallback when the normal Gemini tool path fails.
