@@ -47,6 +47,26 @@ In `src/elements/*/initialize.js` and `update.js`, omit Bubble's outer
 
 Bubble `secure` shared keys are server-only; element code never receives them.
 
+## Git PR routing and release boundaries
+
+For plugin source changes that need a GitHub PR, or requests to open, babysit,
+ship through, or resume that PR, read [pr-shepherd](../pr-shepherd/SKILL.md).
+It owns Git PR creation, review/CI polling, evidence-based fixes or questions,
+guarded Git merge, and task-owned Git cleanup. Opening a PR starts that loop;
+it does not finish the task.
+
+Scoped ship-through-PR intent can authorize the eventual **Git merge** once its
+gates pass; opening a PR alone cannot. **Git merge is not Pled push/upload,
+Bubble branch merge, plugin release, or a live deployment.** It does not replace
+this skill's external-change authorization, real-preview verification, or
+immediate confirmations. If Git merge triggers a Bubble/live release, obtain
+that release's required authorization before merging Git.
+
+The immediate-confirmation rules below remain in force for Bubble merges,
+releases, branch deletion, and direct changes to `test` or `live`, even when
+the Git PR is approved and its merge was authorized earlier. Follow stricter
+repository instructions as well.
+
 ## Change workflow
 
 1. Inspect `AGENTS.md`, `git status`, `pled status`, and the relevant source
@@ -74,11 +94,14 @@ buildprint project clone <app> --branch <issue>-<slug> --dir <workspace-root>
 ```
 
 Treat `pled pull`, `pled push`, `pled upload`, `buildprint branch create`,
-`buildprint apply`, merges, releases, and branch deletion as mutations. Verify
-the exact target and rollback before each. Feature-branch work that is plainly
-inside an implementation request needs no extra confirmation; merges,
-releases, branch deletion, and any direct change to `test` or `live` require
-explicit confirmation immediately before they run.
+`buildprint apply`, Bubble/platform merges, releases, and branch deletion as
+mutations. Verify the exact target and rollback before each. Feature-branch
+work that is plainly inside an implementation request needs no extra
+confirmation; Pled push/upload still needs the external-change authorization
+above. Bubble/platform merges, releases, branch deletion, and any direct change
+to `test` or `live` require explicit confirmation immediately before they run.
+Git PR merge and task-owned Git cleanup use the scoped-consent rules in
+[pr-shepherd](../pr-shepherd/SKILL.md), without bypassing these platform gates.
 
 ## Verification and completion
 

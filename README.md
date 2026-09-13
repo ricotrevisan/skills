@@ -26,6 +26,15 @@ Turn a service — coaching, agency, consulting, or productized — into punchy 
 
 Adapted from Aaron Shepherd's ([GrowthFlare](https://www.youtube.com/@AaronxShepherd)) video ["Give me 24 min and I'll make your cold emails impossible to ignore"](https://www.youtube.com/watch?v=N5ORVjBPlcg). All credit for the underlying ideas goes to him; this skill simply packages them for reuse.
 
+### [pr-shepherd](skills/pr-shepherd/SKILL.md)
+
+Create or resume a GitHub PR and carry it through review/CI, verified fixes or
+questions, scoped-consent merge, runtime verification, and task-owned cleanup.
+Includes 60-second feedback polling, edited-comment detection, current-revision
+review gates, and durable watcher/resume guidance using the agent host's actual
+capabilities. This is a portable procedure, not an installed automation service;
+installing it does not enroll a repository in automatic review.
+
 ### [bubble-plugin-development](skills/bubble-plugin-development/SKILL.md)
 
 Workflow for Bubble.io plugin repos that use Pled (plugin source sync) and Buildprint (dev app): the two-code-piles layout, the Pled pull/push/watch loop, runtime bundle releases, Buildprint branching, and how to verify changes against the real Bubble UI. Plugin-specific facts stay in each repo's `AGENTS.md`.
