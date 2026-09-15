@@ -7,6 +7,7 @@ The automatic-review pilot is approved only for:
 - `Mochary-Method/defacto`
 - `ricotrevisan/plugin_prophet`
 - `ricotrevisan/brussels-wtf`
+- `ricotrevisan/bubble_ex`
 
 `ricotrevisan/skills` is **not enrolled**. Installing this skill or opening a PR
 does not add a webhook. Do not expand the allowlist or provision review services
