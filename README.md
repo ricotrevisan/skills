@@ -30,10 +30,9 @@ Adapted from Aaron Shepherd's ([GrowthFlare](https://www.youtube.com/@AaronxShep
 
 Create or resume a GitHub PR and carry it through review/CI, verified fixes or
 questions, scoped-consent merge, runtime verification, and task-owned cleanup.
-Includes 60-second feedback polling, edited-comment detection, current-revision
-review gates, and durable watcher/resume guidance using the agent host's actual
-capabilities. This is a portable procedure, not an installed automation service;
-installing it does not enroll a repository in automatic review.
+Reference files hold the review-receipt rules, the continuity and watcher
+mechanics, and a scenario audit. This is a portable procedure, not an installed
+automation service; installing it does not enroll a repository in automatic review.
 
 ### [bubble-plugin-development](skills/bubble-plugin-development/SKILL.md)
 
