@@ -27,17 +27,22 @@ scratch.
 ## Copy
 
 Write for a medior Bubble developer choosing a plugin for a SaaS app.
+Plain, straightforward, clear. No flourish.
 
-- Make headings benefits rather than control names: “Menus that escape the
-  box.”
-- Name the Bubble pain and the plugin seam that solves it.
-- Use concrete proof: size, dependencies, placements, states, events, and
-  workflows.
+- Name what the section demonstrates. Headings are plain feature names:
+  "Single select with search", "Selection limits".
+- State concrete facts: what it does, what publishes back to Bubble, what it
+  avoids.
+- Use concrete proof where it changes a decision: dependencies, placements,
+  states, events, workflows.
+- No slogans, no "pain/seam" storytelling, no fragment-style headings
+  ("One field. Lots of placements."), no decorative bullet-separated proof
+  lines, no em-dash asides.
 - Give each section one job a Bubble builder already recognizes.
 
 ## Structure
 
-1. Hero: what the plugin is and why its browser primitive matters.
+1. Hero: what the plugin is and what it needs from Bubble.
 2. Three to five interactive playgrounds using real elements and workflows.
 3. One before/after showing the native Bubble failure and the plugin behavior.
 4. A closing callout explaining how to wire the plugin.
