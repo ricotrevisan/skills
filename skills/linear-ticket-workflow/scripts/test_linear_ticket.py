@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import pathlib
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -75,10 +76,34 @@ class TransportTests(unittest.TestCase):
         mocked_run.return_value.returncode = 0
         mocked_run.return_value.stdout = '{"data":{"ok":true}}'
         mocked_run.return_value.stderr = ""
-        result = linear_ticket.Transport(mode="auto", host="lab").call({"query": "query { ok }"})
+        result = linear_ticket.Transport(mode="auto", host="lab", account="work").call({"query": "query { ok }"})
         self.assertEqual(result["data"]["ok"], True)
         command = mocked_run.call_args.args[0]
         self.assertEqual(command[:4], ["ssh", "-o", "BatchMode=yes", "lab"])
+
+    def test_missing_account_fails_closed(self):
+        with self.assertRaisesRegex(linear_ticket.LinearError, "no Loggie account configured"):
+            linear_ticket.Transport(mode="local").call({"query": "query { ok }"})
+
+
+class ConfigTests(unittest.TestCase):
+    def test_finds_config_up_to_git_root(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = pathlib.Path(raw)
+            (root / ".git").mkdir()
+            (root / ".linear-ticket.json").write_text('{"loggieAccount":"work"}', encoding="utf-8")
+            child = root / "apps" / "web"
+            child.mkdir(parents=True)
+            path, config = linear_ticket.find_config(child)
+            self.assertEqual(path, root / ".linear-ticket.json")
+            self.assertEqual(config["loggieAccount"], "work")
+
+    def test_project_mismatch_fails(self):
+        current = issue()
+        current["organization"] = {"name": "MocharyMethod"}
+        current["project"] = {"name": "Other"}
+        with self.assertRaisesRegex(linear_ticket.LinearError, "expects Linear project"):
+            linear_ticket.validate_routing(current, {"linearProject": "Defacto"}, pathlib.Path(".linear-ticket.json"))
 
 
 if __name__ == "__main__":

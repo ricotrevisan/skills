@@ -7,7 +7,23 @@ description: Keep a Linear ticket's status truthful while an autonomous coding a
 
 When the task names a Linear issue, treat that issue as part of the execution contract. Update it as work changes state; do not leave the board stale and do not mark an agent turn as completed work.
 
-Use the bundled `scripts/linear-ticket` command. It calls Linear through the configured Loggie integration, verifies every write by reading the issue back, and deduplicates lifecycle comments. If Loggie is not installed locally, the default `auto` transport uses `ssh lab`; override with `--transport` or `LINEAR_TICKET_TRANSPORT` when needed.
+Use the bundled `scripts/linear-ticket` command. It calls Linear through the repository's explicitly configured Loggie account, verifies every write by reading the issue back, and deduplicates lifecycle comments. If Loggie is not installed locally, the default `auto` transport uses `ssh lab`; override with `--transport` or `LINEAR_TICKET_TRANSPORT` when needed.
+
+## Repository routing
+
+Every repository that uses Linear must contain `.linear-ticket.json` at its Git root:
+
+```json
+{
+  "loggieAccount": "work",
+  "linearWorkspace": "MocharyMethod",
+  "linearProject": "Defacto"
+}
+```
+
+`loggieAccount` is required and selects credentials through `loggie-account`. `linearWorkspace` and `linearProject` are optional but strongly recommended safety checks: the command refuses to update a ticket that resolves to a different workspace or project. The CLI searches from the current directory up to the Git root and fails closed when no account is configured. `--loggie-account` is an explicit one-off override, not a substitute for repository configuration.
+
+Also document the same policy in `AGENTS.md`, including the exact Loggie account alias, Linear workspace/project, and instruction to use this skill. Repositories whose canonical tracker is GitHub must not receive `.linear-ticket.json` or Linear lifecycle instructions.
 
 ## Lifecycle
 
@@ -66,7 +82,7 @@ Only mark completed when the ticket's real completion boundary has been met:
 ## Operating rules
 
 1. Preserve the exact Linear identifier from the task. Do not infer a different issue from branch names or prose.
-2. Run lifecycle updates from the agent host. `lab` uses local Loggie; hosts without Loggie may use the verified SSH fallback to `lab`.
+2. Run lifecycle updates from the repository so `.linear-ticket.json` is discovered. `lab` uses `loggie-account` locally; hosts without Loggie may use the verified SSH fallback to `lab`.
 3. Never create states, change assignment, alter priority, or rewrite the issue description as part of lifecycle tracking.
 4. Use one concise blocker or evidence comment, not progress-journal spam. Identical retries are idempotent.
 5. If a Linear update fails, report it as a task-tracking failure. Do not claim the ticket was updated.
