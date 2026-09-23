@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import pathlib
 import re
 import shlex
 import shutil
@@ -33,18 +34,25 @@ class Transport:
     mode: str = "auto"
     host: str = "lab"
     slug: str = "linear"
+    account: str | None = None
 
     def _local_available(self) -> bool:
         return shutil.which("loggie") is not None
 
     def call(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if not self.account:
+            raise LinearError(
+                "no Loggie account configured; set loggieAccount in .linear-ticket.json "
+                "or pass --loggie-account"
+            )
         body = json.dumps(payload, separators=(",", ":"))
+        loggie_command = ["loggie-account", self.account, "call", self.slug, "POST", "/", "-b", body]
         if self.mode == "local" or (self.mode == "auto" and self._local_available()):
-            command = ["loggie", "call", self.slug, "POST", "/", "-b", body]
+            command = loggie_command
         elif self.mode in {"auto", "ssh"}:
             remote = " ".join(
                 shlex.quote(part)
-                for part in ["loggie", "call", self.slug, "POST", "/", "-b", body]
+                for part in loggie_command
             )
             command = ["ssh", "-o", "BatchMode=yes", self.host, remote]
         else:
@@ -85,9 +93,11 @@ def graphql(transport: Transport, query: str, variables: dict[str, Any]) -> dict
 
 ISSUE_QUERY = """
 query IssueForAgent($id: String!) {
+  organization { name }
   issue(id: $id) {
     id identifier title url
     state { id name type }
+    project { id name }
     team { id key name states { nodes { id name type position } } }
     comments(first: 100) { nodes { id body } }
   }
@@ -111,10 +121,47 @@ mutation CommentOnAgentIssue($input: CommentCreateInput!) {
 
 
 def fetch_issue(transport: Transport, issue_id: str) -> dict[str, Any]:
-    issue = graphql(transport, ISSUE_QUERY, {"id": issue_id}).get("issue")
+    data = graphql(transport, ISSUE_QUERY, {"id": issue_id})
+    issue = data.get("issue")
     if not isinstance(issue, dict):
         raise LinearError(f"Linear issue not found: {issue_id}")
+    issue["organization"] = data.get("organization")
     return issue
+
+
+def find_config(start: pathlib.Path | None = None) -> tuple[pathlib.Path | None, dict[str, Any]]:
+    current = (start or pathlib.Path.cwd()).resolve()
+    for directory in [current, *current.parents]:
+        candidate = directory / ".linear-ticket.json"
+        if candidate.is_file():
+            try:
+                value = json.loads(candidate.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise LinearError(f"invalid {candidate}: {exc}") from exc
+            if not isinstance(value, dict):
+                raise LinearError(f"invalid {candidate}: expected a JSON object")
+            return candidate, value
+        if (directory / ".git").exists():
+            break
+    return None, {}
+
+
+def validate_routing(issue: dict[str, Any], config: dict[str, Any], config_path: pathlib.Path | None) -> None:
+    source = str(config_path) if config_path else "routing configuration"
+    expected_workspace = config.get("linearWorkspace")
+    actual_workspace = (issue.get("organization") or {}).get("name")
+    if expected_workspace and actual_workspace != expected_workspace:
+        raise LinearError(
+            f"{source} expects Linear workspace {expected_workspace!r}, "
+            f"but {issue['identifier']} resolved in {actual_workspace!r}"
+        )
+    expected_project = config.get("linearProject")
+    actual_project = (issue.get("project") or {}).get("name")
+    if expected_project and actual_project != expected_project:
+        raise LinearError(
+            f"{source} expects Linear project {expected_project!r}, "
+            f"but {issue['identifier']} belongs to {actual_project!r}"
+        )
 
 
 def choose_state(issue: dict[str, Any], event: str) -> dict[str, Any] | None:
@@ -188,6 +235,7 @@ def parser() -> argparse.ArgumentParser:
     common.add_argument("--transport", choices=["auto", "local", "ssh"], default=os.getenv("LINEAR_TICKET_TRANSPORT", "auto"))
     common.add_argument("--loggie-host", default=os.getenv("LINEAR_TICKET_LOGGIE_HOST", "lab"))
     common.add_argument("--slug", default=os.getenv("LINEAR_TICKET_LOGGIE_SLUG", "linear"))
+    common.add_argument("--loggie-account", help="Loggie account alias, normally configured by .linear-ticket.json")
     common.add_argument("--dry-run", action="store_true", help="Resolve and print the transition without writing")
     common.add_argument("--allow-reopen", action="store_true", help="Explicitly allow moving a completed/canceled issue back into active work")
 
@@ -209,11 +257,14 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
-    transport = Transport(args.transport, args.loggie_host, args.slug)
     try:
+        config_path, config = find_config()
+        account = args.loggie_account or os.getenv("LINEAR_TICKET_LOGGIE_ACCOUNT") or config.get("loggieAccount")
+        transport = Transport(args.transport, args.loggie_host, args.slug, account)
         issue = fetch_issue(transport, args.issue)
+        validate_routing(issue, config, config_path)
         if args.event == "status":
-            print(json.dumps({"identifier": issue["identifier"], "title": issue["title"], "state": issue["state"], "url": issue["url"]}, indent=2))
+            print(json.dumps({"identifier": issue["identifier"], "title": issue["title"], "state": issue["state"], "workspace": (issue.get("organization") or {}).get("name"), "project": (issue.get("project") or {}).get("name"), "loggieAccount": account, "config": str(config_path) if config_path else None, "url": issue["url"]}, indent=2))
             return 0
 
         if args.event in {"start", "review", "block"} and issue["state"]["type"] in {"completed", "canceled"} and not args.allow_reopen:
