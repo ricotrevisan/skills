@@ -30,6 +30,26 @@ If preflight fails, report each missing command, credential, or repo marker.
 Set up only what the user asked to change. Never print `BUBBLE_COOKIE`, copy it
 into a repo, or expose Buildprint authentication files.
 
+## Buildprint workspace routing
+
+The Buildprint CLI holds one workspace token at a time. Resolve the target app
+from the plugin repo's `AGENTS.md`, then link the matching 1Password field from
+the `Dev/buildprint` item before relying on `buildprint project list`:
+
+- `credential` — Defacto workspace; app `mm-137`.
+- `workspace_ricowtf` — rico.wtf workspace; apps `tiptap-plugin` and
+  `nocode-to-knowcode`.
+
+Pass the secret directly without printing it, for example:
+
+```sh
+buildprint link "$(op read 'op://Dev/buildprint/credential')"
+```
+
+Keep the CLI linked to Defacto when it is idle. After a temporary check of the
+rico.wtf workspace, restore `credential`; keep another workspace linked only
+while the current task needs it.
+
 ## Sources of truth
 
 - `src/` is decoded Bubble plugin source. Pled uploads it.
