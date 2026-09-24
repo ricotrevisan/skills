@@ -12,6 +12,12 @@ Start T3Code threads with complete task handoffs and prepared worktrees through
 the local server. Includes a Python helper for CLI authentication, project/thread
 creation, status verification, and receipts that prevent blind duplicate retries.
 
+### [linear-ticket-workflow](skills/linear-ticket-workflow/SKILL.md)
+
+Keep Linear status aligned with autonomous agent work: start, review, blocked, and
+completed transitions through a verified, idempotent Loggie-backed CLI. Hosts
+without local Loggie can use the built-in SSH fallback to `lab`.
+
 ### [video-analysis](skills/video-analysis/SKILL.md)
 
 Watch, review, or diagnose videos with Gemini full-duration video input. Distinguishes model video input from client-side frame extraction and includes a compact full-video fallback when the normal Gemini tool path fails.
@@ -26,11 +32,23 @@ Turn a service — coaching, agency, consulting, or productized — into punchy 
 
 Adapted from Aaron Shepherd's ([GrowthFlare](https://www.youtube.com/@AaronxShepherd)) video ["Give me 24 min and I'll make your cold emails impossible to ignore"](https://www.youtube.com/watch?v=N5ORVjBPlcg). All credit for the underlying ideas goes to him; this skill simply packages them for reuse.
 
+### [pr-shepherd](skills/pr-shepherd/SKILL.md)
+
+Create or resume a GitHub PR and carry it through review/CI, verified fixes or
+questions, scoped-consent merge, runtime verification, and task-owned cleanup.
+Reference files hold the review-receipt rules, the continuity and watcher
+mechanics, and a scenario audit. This is a portable procedure, not an installed
+automation service; installing it does not enroll a repository in automatic review.
+
 ### [bubble-plugin-development](skills/bubble-plugin-development/SKILL.md)
 
 Workflow for Bubble.io plugin repos that use Pled (plugin source sync) and Buildprint (dev app): the two-code-piles layout, the Pled pull/push/watch loop, runtime bundle releases, Buildprint branching, and how to verify changes against the real Bubble UI. Plugin-specific facts stay in each repo's `AGENTS.md`.
 
 Includes a credential-safe setup preflight plus focused references for demo-page design and destructive Bubble branch cleanup.
+
+### [bubble-plugin-dx](skills/bubble-plugin-dx/SKILL.md)
+
+Grade Bubble plugin element usability for junior and senior builders. Includes an evidence-based DX rubric, audience weights, ease-versus-power guidance, and usability validation tasks.
 
 ## Install
 

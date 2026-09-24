@@ -6,7 +6,7 @@ and deployment behavior require task-specific execution. Re-audit when changing
 a gate or permission boundary.
 
 Rules: [main workflow](../SKILL.md), [review receipts](review-receipts.md),
-[Bubble workflow](../../bubble-plugin-development/SKILL.md).
+[continuity](continuity.md), [Bubble workflow](../../bubble-plugin-development/SKILL.md).
 
 | Scenario | Required outcome in the authored workflow | Rule |
 | --- | --- | --- |
@@ -31,7 +31,7 @@ Rules: [main workflow](../SKILL.md), [review receipts](review-receipts.md),
 | Three unresolved fix/re-review rounds | Escalate evidence and decision; no gate waiver or endless churn. | Main 4 |
 | Late substantive feedback during two-minute quiet | Reset quiet and address feedback; bookkeeping reply alone does not reset. | Main 5 |
 | Head changes immediately before merge | Expected-head guard rejects; refresh and re-review. | Main 5 |
-| Base changes or merge queue waits | Require fresh evidence for movement; queued is not merged; base/feedback race remains explicit. | Main 5 |
+| Base changes or merge queue waits | Require fresh evidence for movement; watch the queue's validations and actual result; queued or auto-merge-enabled is not merged; base/feedback race remains explicit. | Main 5 |
 | Merge command succeeds or times out ambiguously | Read back merged state/SHA/target inclusion; reconcile before retry. | Main 5 |
 | Skills repo PR has no pilot comment | Not enrolled; arrange configured/independent review or ask for explicit waiver, not a new hook. | Receipts: scope |
 | Reviewer host/DB inaccessible | Use trusted current GitHub publication; ask operator if ambiguous, not a mandatory local DB lookup. | Receipts: evidence |
