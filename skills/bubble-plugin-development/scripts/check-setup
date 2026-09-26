@@ -77,10 +77,11 @@ if [[ "$live" == true && "$failures" -eq 0 ]]; then
     missing 'Pled remote status'
   fi
 
+  bp_access="Buildprint project access (profile: ${BUILDPRINT_PROFILE:-shared active profile})"
   if buildprint project list; then
-    ok 'Buildprint project access'
+    ok "$bp_access"
   else
-    missing 'Buildprint project access'
+    missing "$bp_access"
   fi
 fi
 

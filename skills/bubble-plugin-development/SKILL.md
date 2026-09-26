@@ -32,23 +32,64 @@ into a repo, or expose Buildprint authentication files.
 
 ## Buildprint workspace routing
 
-The Buildprint CLI holds one workspace token at a time. Resolve the target app
-from the plugin repo's `AGENTS.md`, then link the matching 1Password field from
-the `Dev/buildprint` item before relying on `buildprint project list`:
+Every Buildprint workspace has its own local CLI profile. Resolve the target
+app from the plugin repo's `AGENTS.md` and select its profile on **every**
+call with `BUILDPRINT_PROFILE`:
 
-- `credential` — Defacto workspace; app `mm-137`.
-- `workspace_ricowtf` — rico.wtf workspace; apps `tiptap-plugin` and
-  `nocode-to-knowcode`.
-
-Pass the secret directly without printing it, for example:
+| Profile | Workspace | Apps |
+| --- | --- | --- |
+| `ricowtf` | rico.wtf | `tiptap-plugin` |
+| `defacto` | Defacto | `mm-137` |
 
 ```sh
-buildprint link "$(op read 'op://Dev/buildprint/credential')"
+BUILDPRINT_PROFILE=ricowtf buildprint project list
+BUILDPRINT_PROFILE=ricowtf "$skill_dir/scripts/check-setup" --live "$PWD"
 ```
 
-Keep the CLI linked to Defacto when it is idle. After a temporary check of the
-rico.wtf workspace, restore `credential`; keep another workspace linked only
-while the current task needs it.
+Every plugin uses two rico.wtf apps unless its `AGENTS.md` says otherwise:
+
+- `tiptap-plugin` — development app and every plugin's test app. Setting it
+  as the test app adds the plugin's Testing version (`<plugin_id>_dev` in the
+  app JSON); develop and verify changes here on a feature branch.
+- `nocode-to-knowcode` — publicly accessible demo pages. They run released
+  versions; update them when a release changes what they show.
+  **Buildprint cannot read or change this app** (it is on Bubble's free
+  plan). Change it only in the Bubble editor; see
+  [Public demo pages](#public-demo-pages).
+
+The active profile in `~/.buildprint/auth.json` is shared by every session on
+the machine. Never run `buildprint profile switch`, `buildprint link`, or
+`buildprint profile create`, and never override `HOME`. If `buildprint profile
+list` lacks the profile you need, stop and ask the user to create it.
+
+## Public demo pages
+
+Small edits to `nocode-to-knowcode` (text, links, page settings, a redirect
+workflow) go straight into its Bubble editor in the browser.
+
+Build new demo sections in `tiptap-plugin`, then copy them over:
+
+1. Build each section as one group on a `tiptap-plugin` feature branch with
+   Buildprint, and verify it there with real clicks and typing.
+2. Open both editors in the same browser. Right-click the group →
+   **Copy with workflows**, then paste it into the target
+   `nocode-to-knowcode` page.
+3. Verify the public page in run mode with real clicks.
+
+Design sections so the paste is clean:
+
+- Build demo sections with the released install, not the Testing one. The
+  Testing install's elements reference `<plugin_id>_dev`, which does not
+  exist in `nocode-to-knowcode`. The released install (`<plugin_id>`) comes
+  from a normal Marketplace install or from authorizing the app in the
+  plugin's settings; `tiptap-plugin` needs it alongside the Testing install,
+  and `nocode-to-knowcode` needs it too.
+- Use only features in the released plugin version.
+- Depend only on what already exists in `nocode-to-knowcode`: no new
+  app-wide styles, option sets, or data types. If a section needs a data
+  type, create it in `nocode-to-knowcode` first so the pasted workflows
+  find it.
+- Keep workflows inside the group; page-level workflows are left behind.
 
 ## Sources of truth
 
@@ -109,8 +150,8 @@ repository instructions as well.
 Typical branch setup:
 
 ```sh
-buildprint branch create <app> <issue>-<slug> --from test
-buildprint project clone <app> --branch <issue>-<slug> --dir <workspace-root>
+BUILDPRINT_PROFILE=<profile> buildprint branch create <app> <issue>-<slug> --from test
+BUILDPRINT_PROFILE=<profile> buildprint project clone <app> --branch <issue>-<slug> --dir <workspace-root>
 ```
 
 Treat `pled pull`, `pled push`, `pled upload`, `buildprint branch create`,
