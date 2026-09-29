@@ -5,11 +5,19 @@ description: Access connected services through the Loggie CLI. Use when the user
 
 ## Loggie account routing
 
-Before any Loggie discovery or call, read `~/.loggie/ACCOUNTS.md` and use `~/.local/bin/loggie-account personal ...` for rico.wtf/personal work or `~/.local/bin/loggie-account work ...` for MocharyMethod/Defacto. Apply that account prefix to every `loggie` example below. Profile names can repeat across accounts; keep the account and connection paired.
+Before any Loggie discovery or call, read `~/.loggie/ACCOUNTS.md` and use `~/.local/bin/loggie-account personal ...` for rico.wtf/personal work, `~/.local/bin/loggie-account work ...` for MocharyMethod/Defacto, or `~/.local/bin/loggie-account unblocklabs ...` for **Loggie UnblockLabs**, including UnblockLabs Linear. Its credential source is 1Password `Dev` → `loggie` → `unblock-labs`; named-account setup is documented in `~/.loggie/ACCOUNTS.md`. Apply that account prefix to every `loggie` example below. Profile names can repeat across accounts; keep the account and connection paired.
 
 # Loggie
 
 Loggie is available through the shell as `loggie` (fallback: `~/.local/bin/loggie`), even when no Loggie MCP tools appear in the session. It proxies authenticated requests to connected services.
+
+## Connections at a glance
+
+Run `~/.local/bin/loggie-account <account> setup` for the live catalog; treat the list below as a hint that Loggie is worth calling, not as the source of truth.
+
+- personal (rico.wtf): Cloudflare, Linear (ricowtf), Coolify, Porkbun, name.com, Buildprint, whoistyping
+- work (MocharyMethod): Linear (MocharyMethod), Stripe, PostHog, Defacto, Buildprint Defacto, SavvyCal, Loops, Meetings, Google (Mochary + Search Console), GitHub, Cloudflare, Tailscale
+- unblocklabs: Linear (unblocklabs)
 
 ## Discover and call
 
