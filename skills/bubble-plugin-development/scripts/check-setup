@@ -51,13 +51,8 @@ done
 
 if [[ -n "${BUBBLE_COOKIE:-}" ]]; then
   ok 'BUBBLE_COOKIE is set'
-elif [[ -r "$HOME/.config/pled/cookie-reference" ]] &&
-     [[ "$(command -v pled)" -ef "$(dirname "$0")/pled-with-auth" ]] &&
-     command -v op >/dev/null 2>&1 &&
-     { [[ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]] || [[ -s "$HOME/.config/op/service-account-token" ]]; }; then
-  ok 'Pled 1Password wrapper is configured (verified by --live)'
 else
-  missing 'BUBBLE_COOKIE or configured Pled 1Password wrapper'
+  missing 'BUBBLE_COOKIE'
 fi
 
 if [[ -d "$repo_path" ]]; then
