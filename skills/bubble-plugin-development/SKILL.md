@@ -11,7 +11,26 @@ it owns the plugin id, app name, demo page, login, build commands, and any
 renderer-specific rules. This skill owns the shared operating procedure.
 
 The workflow requires Bash, Node.js/npm, Pled, Buildprint CLI,
-`BUBBLE_COOKIE`, and a plugin repo with `AGENTS.md`.
+Pled credentials, and a plugin repo with `AGENTS.md`.
+
+## Pled credentials
+
+On the Mac mini, run `pled` directly. `~/.local/bin/pled` uses
+[scripts/pled-with-auth](scripts/pled-with-auth) to read the current cookie
+from the 1Password reference in `~/.config/pled/cookie-reference` for each
+remote command. It reloads the service-account token from
+`~/.config/op/service-account-token` on each invocation, preferring that file
+over inherited credentials so token rotation also works in existing sessions.
+Without the file it uses `OP_SERVICE_ACCOUNT_TOKEN` from the environment;
+this works in non-interactive shells and other worktrees. `op run` stops the
+command if credential loading fails. An absent global `BUBBLE_COOKIE` is
+normal with this wrapper.
+
+The configured vault is `Dev`; the old `agent-logins/Bubble/password`
+reference is obsolete. Keep raw cookies out of profiles, repositories, and
+`.env` files. Other installations may supply `BUBBLE_COOKIE` themselves.
+When upgrading Pled on this Mac, replace `~/.local/libexec/pled` and preserve
+the wrapper at `~/.local/bin/pled`.
 
 ## Preflight
 
