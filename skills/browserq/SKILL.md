@@ -15,12 +15,15 @@ Run all browser automation through browserq: `agent-browser` runs only as `brows
    ```
    `$AGENT` is a stable name for your task (e.g. the worktree name). Queue progress goes to stderr; the job id is the only stdout line. Done when `$JOB` holds a `bq-…` id.
 3. **Drive it.** `browserq --agent "$AGENT" exec "$JOB" -- <agent-browser command>`, for example `open https://example.com/`, `snapshot -i`, `get text h1`, `click @e3`, `screenshot page.png`. Run commands one at a time; a second concurrent command in the same session is refused as busy. Add `--timeout 90s` before `--` for slow pages.
-4. **Check Lightpanda output.** If a `lightpanda` session returns missing or wrong content and you have run only read-only commands, switch with `JOB=$(browserq --agent "$AGENT" fallback "$JOB")` and repeat your read-only steps in the fresh Chrome session. Fallback is refused once you clicked, typed, filled, pressed keys, evaluated JS or reloaded.
+   For pages behind a login, import cookies before opening the page: `browserq --agent "$AGENT" cookies import "$JOB" <file> --domain example.com` (or `--url https://app.example.com/`; `-` reads the file from stdin). See "Cookies" below.
+4. **Check Lightpanda output.** If a `lightpanda` session returns missing or wrong content and you have run only read-only commands, switch with `JOB=$(browserq --agent "$AGENT" fallback "$JOB")` and repeat your read-only steps in the fresh Chrome session. Fallback is refused once you clicked, typed, filled, pressed keys, evaluated JS, reloaded or imported cookies.
 5. **Release.** `browserq --agent "$AGENT" close "$JOB"` as soon as the browser work is finished. Done when it prints `closed`.
 
 ## Reference
 
-**What browserq owns.** It chooses the engine binary, the session, the profile, the config and the browser endpoint, so passing `--session`, `--cdp`, `--profile`, `--engine`, `--config`, `connect`, `close`, cookies/state/auth commands, `file:` URLs or screenshot paths with directories is rejected (exit 65, reason on stderr). Text arguments starting with `-` are rejected too, because agent-browser would parse them as options. Screenshots take a plain file name and land in browserq's artifact directory; the path is printed on stderr.
+**Cookies.** Ask the user to save the cookies to a file and give you its path (DevTools → Network → right-click an authenticated request → Copy as cURL; a JSON array of `{name, value}` or a bare `Cookie:` header also works). Pass the path to `cookies import`; the file content goes to the daemon, never into command arguments or logs. Keep the values out of your context: never print, `cat` or paste the file. Cookies exist only in that session and vanish on `close`; a new session starts logged out. `cookies clear` empties the session. Authenticated work runs on `chrome`.
+
+**What browserq owns.** It chooses the engine binary, the session, the profile, the config and the browser endpoint, so passing `--session`, `--cdp`, `--profile`, `--engine`, `--config`, `connect`, `close`, `cookies get/set`, state/auth commands, `file:` URLs or screenshot paths with directories is rejected (exit 65, reason on stderr). Text arguments starting with `-` are rejected too, because agent-browser would parse them as options. Screenshots take a plain file name and land in browserq's artifact directory; the path is printed on stderr.
 
 **Exit codes.**
 
