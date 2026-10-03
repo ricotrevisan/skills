@@ -17,25 +17,38 @@ permission from an earlier request to edit or test.
 
 ## Tiptap branch deletion helper
 
-The bundled `scripts/delete-bubble-branch.js` is a Tiptap-specific fallback for
-Bubble versions where the CLI exposes no deletion command. It drives the Bubble
-editor with a fixed 1700×1050 viewport, hard-coded app/login details, and a few
-coordinate clicks. Inspect the script before every use and prefer a supported
-Buildprint or Bubble operation when one exists.
+The bundled `scripts/delete-bubble-branch.sh` is a fallback for Bubble versions
+where the CLI exposes no deletion command. It drives the Bubble editor through
+`browserq` (Chrome, 1700×1050 viewport) using the `BUBBLE_COOKIE` editor login,
+which it pipes to `browserq cookies import`. It clicks the branch row by exact
+text, opens the branch's `…` menu by coordinates, and proceeds only if the menu
+shows the branch's Buildprint ID and the dialog names the branch. Inspect the
+script before every use and prefer a supported Buildprint or Bubble operation
+when one exists.
 
-After explicit deletion approval:
+Rehearse first, then delete after explicit approval:
 
 ```sh
 skill_dir="${AGENT_SKILL_DIR:-$HOME/.agents/skills/bubble-plugin-development}"
-node "$skill_dir/scripts/delete-bubble-branch.js" <exact-branch-name>
+"$skill_dir/scripts/delete-bubble-branch.sh" --dry-run <exact-branch-name>
+"$skill_dir/scripts/delete-bubble-branch.sh" <exact-branch-name>
 ```
+
+`--dry-run` stops at the confirmation dialog and closes it. Opening a branch in
+the editor (including in a dry run) updates its "Updated" time in Bubble. The
+app defaults to `tiptap-plugin` (`BUBBLE_APP`, `BUILDPRINT_PROFILE=ricowtf`).
+Screenshots are printed as browserq artifact paths.
 
 Requirements:
 
 - `BUBBLE_COOKIE` is set without being printed.
-- Playwright and its Chromium build are already installed.
-- The Bubble editor layout still matches the helper's expected viewport.
+- `browserq` is running on this machine and the Buildprint CLI can list the
+  app's branches.
+- The Bubble editor layout still matches the helper (`…` menu at 276,66);
+  the ID check stops it if the layout drifts.
 
+The helper reports success only when `buildprint branch list` no longer lists
+the branch.
 Treat “not listed” as ambiguous until you separately verify the app and branch
 selector. Completion requires confirming that the exact branch no longer
 appears and that the intended destination branch still contains the merged
