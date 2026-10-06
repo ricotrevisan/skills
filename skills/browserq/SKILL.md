@@ -1,9 +1,11 @@
 ---
 name: browserq
-description: Browser automation on lab through the browserq admission queue. Use whenever a task needs a browser session (open, snapshot, extract, click, screenshot) or a choice between Chrome and Lightpanda.
+description: Standalone browser automation on lab through the browserq admission queue, including Chrome versus Lightpanda selection. Use outside the harness-provided collaborative browser, or when the user explicitly requests another browser or the collaborative preview is unavailable.
 ---
 
-Run all browser automation through browserq: `agent-browser` runs only as `browserq exec <job> -- <command>`. browserq leases one browser session at a time from a shared, capped pool and runs the commands inside it. One lease covers the whole session, so hold it across all your steps and release it promptly.
+Follow the host's browser policy. In T3, use the collaborative `preview_*` tools first: check `preview_status`, then `preview_open` if no automation-capable preview is attached. Use another browser only when explicitly requested or `preview_open` reports unsupported/unavailable. Collaborative preview tools do not need a browserq lease.
+
+For standalone browser automation on lab, use browserq: `agent-browser` runs only as `browserq exec <job> -- <command>`. browserq leases one browser session at a time from a shared, capped pool and runs the commands inside it. One lease covers the whole session, so hold it across all your steps and release it promptly.
 
 ## Steps
 
