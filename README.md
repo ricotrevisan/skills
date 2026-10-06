@@ -50,6 +50,10 @@ Includes a credential-safe setup preflight plus focused references for demo-page
 
 Grade Bubble plugin element usability for junior and senior builders. Includes an evidence-based DX rubric, audience weights, ease-versus-power guidance, and usability validation tasks.
 
+### [elixir-phoenix](skills/elixir-phoenix/SKILL.md)
+
+Conventions for Elixir/Phoenix work in Rico's projects: run `mix setup` in a fresh Phoenix worktree, treat a `Mix.PubSub` `:eperm` socket error as the sandbox rather than a permissions bug, and keep Ash controllers thin — data access lives in resource actions and domains, controllers parse → call → render.
+
 ## Install
 
 Clone the repo, then symlink every skill into the directories your agent clients load:
