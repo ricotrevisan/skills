@@ -39,4 +39,4 @@ Keep observations separate from inference. Never claim Gemini watched a recordin
 
 ## Credential safety
 
-Read `GEMINI_API_KEY` from the environment. Never print it, write it into the skill, include it in a URL, or commit it. If the key is absent, the bundled script falls back to `op read op://Dev/Gemini API/credential` (the canonical copy in the 1Password Dev vault) and succeeds whenever `op` is installed and unlocked; no plaintext copy on disk is required. Only ask the user to inject the key through their secret-management setup when both routes fail.
+Read `GEMINI_API_KEY` from the environment. Never print it, write it into the skill, include it in a URL, or commit it. If the key is absent, the bundled script falls back to `op read op://Dev/tuisdffrgbcrrxzpnhyxjlm6oa/API keys/Gemini` (Dev vault item "Google -  Mochary Method", section "API keys", field "Gemini") and succeeds whenever `op` is installed and unlocked; no plaintext copy on disk is required. Only ask the user to inject the key through their secret-management setup when both routes fail.

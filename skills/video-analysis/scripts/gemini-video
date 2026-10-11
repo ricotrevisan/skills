@@ -6,8 +6,9 @@ usage() {
 Usage: gemini-video VIDEO [PROMPT]
 
 Submit a compact, full-duration copy of VIDEO to Gemini, including audio.
-Requires GEMINI_API_KEY (or an unlocked `op` CLI with the Dev vault item
-"Gemini API"), ffmpeg, and python3.
+Requires GEMINI_API_KEY (or an unlocked `op` CLI able to read the Dev vault
+item "Google -  Mochary Method" → section "API keys" → field "Gemini"),
+ffmpeg, and python3.
 
 Optional environment variables:
   GEMINI_VIDEO_MODEL         Gemini model (default: gemini-3.8-flash)
@@ -35,13 +36,16 @@ inline_limit=${GEMINI_VIDEO_INLINE_LIMIT:-14680064}
 [[ -f "$video" ]] || { echo "Video not found: $video" >&2; exit 1; }
 
 # If no API key is in the environment, resolve the canonical copy from
-# 1Password. Keeps machines free of plaintext key copies and degrades to
-# the old guard when `op` is absent, locked, or the item is missing.
+# 1Password (Dev vault, item "Google -  Mochary Method", section "API
+# keys", field "Gemini"; referenced by item UUID so title whitespace and
+# renames cannot break the lookup). Keeps machines free of plaintext key
+# copies and degrades to the old guard when `op` is absent, locked, or the
+# item is missing.
 if [[ -z "${GEMINI_API_KEY:-}" ]] && command -v op >/dev/null 2>&1; then
-  GEMINI_API_KEY="$(op read "op://Dev/Gemini API/credential" 2>/dev/null || true)"
+  GEMINI_API_KEY="$(op read "op://Dev/tuisdffrgbcrrxzpnhyxjlm6oa/API keys/Gemini" 2>/dev/null || true)"
 fi
 [[ -n "${GEMINI_API_KEY:-}" ]] || {
-  echo "GEMINI_API_KEY is not set (tried op read op://Dev/Gemini API/credential)" >&2
+  echo "GEMINI_API_KEY is not set (tried op read op://Dev/tuisdffrgbcrrxzpnhyxjlm6oa/API keys/Gemini)" >&2
   exit 1
 }
 command -v ffmpeg >/dev/null || { echo "ffmpeg is required" >&2; exit 1; }
