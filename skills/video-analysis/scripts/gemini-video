@@ -43,6 +43,7 @@ inline_limit=${GEMINI_VIDEO_INLINE_LIMIT:-14680064}
 # item is missing.
 if [[ -z "${GEMINI_API_KEY:-}" ]] && command -v op >/dev/null 2>&1; then
   GEMINI_API_KEY="$(op read "op://Dev/tuisdffrgbcrrxzpnhyxjlm6oa/API keys/Gemini" 2>/dev/null || true)"
+  export GEMINI_API_KEY
 fi
 [[ -n "${GEMINI_API_KEY:-}" ]] || {
   echo "GEMINI_API_KEY is not set (tried op read op://Dev/tuisdffrgbcrrxzpnhyxjlm6oa/API keys/Gemini)" >&2
