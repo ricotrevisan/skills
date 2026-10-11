@@ -13,7 +13,7 @@ Treat **full-duration video input** and **client-side frame extraction** as diff
 1. Resolve the actual video path. A CleanShot path supplied alongside a screenshot may point to the screenshot rather than the recording; inspect the named media directory when necessary.
 2. When `fetch_content` is available, send the complete video to Gemini:
    - Use a local `file://` URL or a service the tool supports, such as YouTube. Download a direct remote `.mp4`/`.mov` URL locally first.
-   - Set `model` to `gemini-3.6-flash`.
+   - Set `model` to `gemini-3.8-flash`.
    - Give a prompt asking for chronological observations, timestamps, audio, and the question to answer.
    - Omit `frames` and `timestamp`; either option selects client-side frame extraction.
 3. Confirm the result is a model analysis rather than a list of extracted frames. The step is complete when Gemini returns a temporal account that answers the user's question.

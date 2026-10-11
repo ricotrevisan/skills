@@ -9,7 +9,7 @@ Submit a compact, full-duration copy of VIDEO to Gemini, including audio.
 Requires GEMINI_API_KEY, ffmpeg, and python3.
 
 Optional environment variables:
-  GEMINI_VIDEO_MODEL         Gemini model (default: gemini-3.6-flash)
+  GEMINI_VIDEO_MODEL         Gemini model (default: gemini-3.8-flash)
   GEMINI_VIDEO_FPS           Fallback video frame rate (default: 10)
   GEMINI_VIDEO_HEIGHT        Maximum fallback height (default: 720)
   GEMINI_VIDEO_CRF           H.264 quality value (default: 30)
@@ -23,7 +23,7 @@ EOF
 
 video=$1
 prompt=${2:-"Watch this complete recording. Describe it chronologically with timestamps, including exact actions, visible state changes, audio when relevant, unexpected behavior, and plausible root-cause clues. Separate direct observations from inference."}
-model=${GEMINI_VIDEO_MODEL:-gemini-3.6-flash}
+model=${GEMINI_VIDEO_MODEL:-gemini-3.8-flash}
 fps=${GEMINI_VIDEO_FPS:-10}
 height=${GEMINI_VIDEO_HEIGHT:-720}
 crf=${GEMINI_VIDEO_CRF:-30}
