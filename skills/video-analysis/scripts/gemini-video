@@ -216,6 +216,8 @@ try:
     if not text:
         print(json.dumps(result, indent=2), file=sys.stderr)
         raise SystemExit(1)
+    if result.get("modelVersion"):
+        print(f"[Gemini modelVersion: {result['modelVersion']}]", file=sys.stderr)
     print(text)
 finally:
     if uploaded_name:
