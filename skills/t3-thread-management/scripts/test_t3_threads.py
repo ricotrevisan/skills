@@ -85,6 +85,16 @@ class PureTests(unittest.TestCase):
         self.assertFalse(t3.started(t3.summarize({'thread': {}, 'runs': [], 'messages': []})))
         self.assertFalse(t3.started({'run': {'status': 'waiting', 'startedAt': None}}))
 
+    def test_setup_scripts_only_for_new_worktrees(self):
+        project = {'scripts': [
+            {'name': 'dev', 'command': 'mix phx.server', 'runOnWorktreeCreate': False},
+            {'name': 'setup', 'command': 'mix setup', 'async': True, 'runOnWorktreeCreate': True},
+            {'name': 'second', 'command': 'never runs', 'runOnWorktreeCreate': True}]}
+        self.assertEqual(t3.setup_scripts(project, {'type': 'worktree', 'baseRef': 'main'}),
+                         [{'name': 'setup', 'command': 'mix setup', 'async': True}])
+        self.assertEqual(t3.setup_scripts(project, {'type': 'root'}), [])
+        self.assertEqual(t3.setup_scripts({}, {'type': 'worktree'}), [])
+
     def test_check_origin(self):
         t3.check_origin('http://127.0.0.1:3773', False)
         t3.check_origin('http://100.124.111.25:8789', True)

@@ -44,6 +44,10 @@ path) are destination paths; `--prompt-file` is read locally and sent as text.
 4. **Dry run.** `start ... --dry-run` resolves the project (id, exact title, or
    workspace root; `--add-project` registers a missing path) and validates the
    selection against the live server. Fix every error it reports.
+   `setupScriptsThatWillRun` shows the project's first `runOnWorktreeCreate`
+   script: the server runs it in a new worktree with no further approval. Review each
+   command (and any script it calls) before launching; if one is unsafe for the
+   task, use the project root or an existing worktree instead and say so.
 5. **Start.** Same arguments without `--dry-run`. Workspace: default is the
    project root; `--worktree-from main --branch t3code/<task>` has the server
    fetch and create the worktree from `origin/main` (`--no-origin` for the local

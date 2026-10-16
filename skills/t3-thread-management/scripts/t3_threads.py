@@ -284,6 +284,14 @@ def workspace_strategy(args):
     return {'type': 'root', **branch}
 
 
+def setup_scripts(project, strategy):
+    """The script the server runs unprompted when launchThread creates a worktree (first match only)."""
+    if strategy.get('type') != 'worktree':
+        return []
+    first = next((s for s in project.get('scripts') or [] if s.get('runOnWorktreeCreate')), None)
+    return [{k: first.get(k) for k in ('name', 'command', 'async')}] if first else []
+
+
 def summarize(projection):
     thread = projection.get('thread') or {}
     runs = projection.get('runs') or []
@@ -379,6 +387,7 @@ def cmd_start(client, args, base):
         payload['initialMessage'] = {'text': prompt, 'attachments': []}
     if args.dry_run:
         return {'dryRun': True, 'project': {k: project.get(k) for k in ('id', 'title', 'workspaceRoot')},
+                'setupScriptsThatWillRun': setup_scripts(project, payload['workspaceStrategy']),
                 'payload': {**payload, 'initialMessage': {'chars': len(prompt or '')}}}
     result = client.rpc('orchestration.launchThread', payload)
     thread_id = result['threadId']
