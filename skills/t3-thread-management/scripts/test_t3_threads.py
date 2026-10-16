@@ -1,167 +1,129 @@
 import argparse
-import copy
 import json
 from pathlib import Path
-import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from t3_threads import run_remote, start
+import t3_threads as t3
+
+PROVIDERS = [
+    {'instanceId': 'codex', 'driver': 'codex', 'enabled': True, 'status': 'ready', 'models': [
+        {'slug': 'gpt-6-astra', 'capabilities': {'optionDescriptors': [
+            {'id': 'reasoningEffort', 'type': 'select', 'options': [{'id': 'low'}, {'id': 'medium'}]},
+            {'id': 'fastMode', 'type': 'boolean'}]}}]},
+    {'instanceId': 'grok', 'driver': 'grok', 'enabled': False, 'status': 'disabled', 'models': []},
+    {'instanceId': 'acp', 'driver': 'acpRegistry', 'enabled': True, 'status': 'ready', 'models': []},
+]
+PROJECTS = [
+    {'id': 'p1', 'title': 'devops', 'workspaceRoot': '/home/rico/devops'},
+    {'id': 'p2', 'title': 'dup', 'workspaceRoot': '/a'},
+    {'id': 'p3', 'title': 'dup', 'workspaceRoot': '/b'},
+    {'id': 'p4', 'title': 'gone', 'workspaceRoot': '/c', 'deletedAt': '2026-01-01'},
+]
 
 
-class FakeClient:
-    def __init__(self, fail=None):
-        self.data = {'projects': [], 'threads': [{
-            'id': 'source', 'projectId': 'other', 'title': 'Source',
-            'modelSelection': {'provider': 'codex', 'model': 'inherited'},
-            'runtimeMode': 'full-access'}]}
-        self.calls = []
-        self.fail = fail
-
-    def snapshot(self):
-        return copy.deepcopy(self.data)
-
-    def dispatch(self, command):
-        self.calls.append(command)
-        if command['type'] == 'project.create':
-            self.data['projects'].append({'id': command['projectId'],
-                'workspaceRoot': command['workspaceRoot']})
-        elif command['type'] == 'thread.create':
-            self.data['threads'].append({**command, 'id': command['threadId']})
-        else:
-            thread = next(t for t in self.data['threads'] if t['id'] == command['threadId'])
-            thread['session'] = {'status': 'running', 'activeTurnId': 'turn'}
-        if command['type'] == self.fail:
-            raise TimeoutError('Response lost after write')
-        return {'sequence': len(self.calls)}
+def ns(**kw):
+    base = dict(worktree_from=None, existing_worktree=None, branch=None, no_origin=False)
+    base.update(kw)
+    return argparse.Namespace(**base)
 
 
-class HandoffTests(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        root = Path(self.temp.name)
-        prompt = root / 'task.txt'
-        prompt.write_text('Build the harness. Preserve the existing checkout.')
-        self.args = argparse.Namespace(workspace=str(root), worktree=None, branch=None,
-            prompt_file=str(prompt), receipt=str(root / 'receipt.json'),
-            title='Build harness', source_thread='source')
+class PureTests(unittest.TestCase):
+    def test_command_id_is_stable_and_required(self):
+        self.assertEqual(t3.command_id('discord-1'), t3.command_id(' discord-1 '))
+        self.assertNotEqual(t3.command_id('discord-1'), t3.command_id('discord-2'))
+        with self.assertRaises(ValueError):
+            t3.command_id('  ')
 
-    def test_creates_project_then_thread_then_turn_and_inherits_settings(self):
-        client = FakeClient()
-        result = start(client, self.args)
-        self.assertEqual([c['type'] for c in client.calls],
-            ['project.create', 'thread.create', 'thread.turn.start'])
-        self.assertEqual(client.calls[-1]['modelSelection'], client.data['threads'][0]['modelSelection'])
-        self.assertEqual(client.calls[-1]['message']['text'], Path(self.args.prompt_file).read_text())
-        self.assertEqual(result['thread']['session']['status'], 'running')
-        start(client, self.args)
-        self.assertEqual(len(client.calls), 3)
-
-    def test_lost_response_never_replays_mutation(self):
-        for stage in ['project.create', 'thread.create', 'thread.turn.start']:
-            with self.subTest(stage=stage):
-                self.args.receipt = str(Path(self.temp.name) / (stage + '.json'))
-                client = FakeClient(fail=stage)
-                with self.assertRaises(TimeoutError):
-                    start(client, self.args)
-                count = len(client.calls)
-                start(client, self.args)
-                self.assertEqual(len(client.calls), count)
-
-    def test_reuses_project_and_attaches_worktree(self):
-        client = FakeClient()
-        client.data['projects'] = [{'id': 'existing', 'workspaceRoot': self.args.workspace}]
-        self.args.worktree = self.args.workspace
-        self.args.branch = 'test/harness'
-        result = start(client, self.args)
-        self.assertEqual(len(client.calls), 2)
-        self.assertEqual(result['thread']['projectId'], 'existing')
-        self.assertEqual(result['thread']['worktreePath'], self.args.worktree)
-
-    def test_duplicate_title_and_changed_receipt_are_rejected(self):
-        client = FakeClient()
-        start(client, self.args)
-        original = self.args.receipt
-        self.args.receipt = str(Path(self.temp.name) / 'another.json')
-        with self.assertRaisesRegex(ValueError, 'thread.*exists'):
-            start(client, self.args)
-        self.args.receipt = original
-        self.args.title = 'Different work'
-        with self.assertRaisesRegex(ValueError, 'different request'):
-            start(client, self.args)
-        self.assertEqual(len(client.calls), 3)
-
-    def test_invalid_worktree_pair_does_not_write(self):
-        client = FakeClient()
-        self.args.branch = 'test/harness'
-        with self.assertRaisesRegex(ValueError, 'together'):
-            start(client, self.args)
-        self.assertEqual(client.calls, [])
-
-    def remote_args(self):
-        return argparse.Namespace(**vars(self.args), host='office', base_dir=None,
-            cli=None, node=None, allow_non_loopback=False, command='start', prompt=None)
-
-    def test_remote_transfer_preserves_prompt_and_target_paths_without_shell_interpolation(self):
-        args = self.remote_args()
-        text = "say 'hello'\n$(touch /tmp/unwanted) `whoami` $HOME"
-        Path(args.prompt_file).write_text(text)
-        args.workspace = '/remote/project with spaces'
-        args.receipt = '/remote/receipt.json'
-        with patch('t3_threads.subprocess.run') as run:
-            run.return_value = subprocess.CompletedProcess([], 0, '{"ok": true}', '')
-            self.assertEqual(run_remote(args), {'ok': True})
-        command = run.call_args.args[0]
-        self.assertEqual(command[-2], 'office')
-        self.assertIn('BatchMode=yes', command)
-        self.assertNotIn(text, ' '.join(command))
-        payload = json.loads(run.call_args.kwargs['input'])
-        remote = payload['args']
-        self.assertEqual(remote[remote.index('--prompt') + 1], text)
-        self.assertIn('/remote/project with spaces', remote)
-        self.assertIn('/remote/receipt.json', remote)
-        self.assertNotIn('--host', remote)
-        self.assertNotIn('--base-dir', remote)
-        self.assertNotIn('--prompt-file', remote)
-        # Execute the actual SSH loader locally with harmless code to verify that
-        # its stdin protocol preserves arguments without interpreting task text.
-        payload['code'] = 'import json,sys; print(json.dumps(sys.argv[1:]))'
-        out = subprocess.run(command[-1], shell=True, input=json.dumps(payload),
-                             text=True, capture_output=True, check=True)
-        self.assertEqual(json.loads(out.stdout), remote)
-
-    def test_remote_inline_prompt_and_destination_overrides(self):
-        args = self.remote_args()
-        args.prompt_file = None
-        args.prompt = 'say hello'
-        args.base_dir = '/Users/rico/.t3code'
-        args.cli = '/remote/bin.ts'
-        args.node = '/remote/node'
-        args.allow_non_loopback = True
-        with patch('t3_threads.subprocess.run') as run:
-            run.return_value = subprocess.CompletedProcess([], 0, '{}', '')
-            run_remote(args)
-        remote = json.loads(run.call_args.kwargs['input'])['args']
-        self.assertEqual(remote[:7], ['--base-dir', args.base_dir, '--cli', args.cli,
-                                     '--node', args.node, '--allow-non-loopback'])
-        self.assertEqual(remote[-2:], ['--prompt', 'say hello'])
-
-    def test_remote_ssh_failure_propagates_without_retry(self):
-        with patch('t3_threads.subprocess.run') as run:
-            run.return_value = subprocess.CompletedProcess([], 255, '', 'Connection closed')
-            with self.assertRaisesRegex(RuntimeError, 'inspect the destination'):
-                run_remote(self.remote_args())
-            self.assertEqual(run.call_count, 1)
-
-    def test_remote_rejects_option_as_host(self):
-        args = self.remote_args()
-        args.host = '-oProxyCommand=bad'
-        with patch('t3_threads.subprocess.run') as run:
+    def test_resolve_project(self):
+        self.assertEqual(t3.resolve_project(PROJECTS, 'devops')['id'], 'p1')
+        self.assertEqual(t3.resolve_project(PROJECTS, 'p1')['id'], 'p1')
+        self.assertEqual(t3.resolve_project(PROJECTS, '/home/rico/devops')['id'], 'p1')
+        for ref in ('dup', 'gone', 'missing'):
             with self.assertRaises(ValueError):
-                run_remote(args)
-            run.assert_not_called()
+                t3.resolve_project(PROJECTS, ref)
+
+    def test_parse_options(self):
+        self.assertEqual(t3.parse_options(['reasoningEffort=low']), [{'id': 'reasoningEffort', 'value': 'low'}])
+        with self.assertRaises(ValueError):
+            t3.parse_options(['noequals'])
+
+    def test_validate_selection(self):
+        sel = t3.validate_selection(PROVIDERS, 'codex', 'gpt-6-astra',
+                                    t3.parse_options(['reasoningEffort=medium', 'fastMode=true']))
+        self.assertEqual(sel, {'instanceId': 'codex', 'model': 'gpt-6-astra', 'options': [
+            {'id': 'reasoningEffort', 'value': 'medium'}, {'id': 'fastMode', 'value': True}]})
+        self.assertNotIn('options', t3.validate_selection(PROVIDERS, 'codex', 'gpt-6-astra', []))
+        # Providers without a model list (ACP before first session) accept any slug.
+        self.assertEqual(t3.validate_selection(PROVIDERS, 'acp', 'anything', [])['model'], 'anything')
+        bad = [('nope', 'gpt-6-astra', []), ('grok', 'grok-build', []), ('codex', 'gpt-0', []),
+               ('codex', 'gpt-6-astra', [{'id': 'reasoningEffort', 'value': 'ultra'}]),
+               ('codex', 'gpt-6-astra', [{'id': 'serviceTier', 'value': 'default'}]),
+               ('codex', 'gpt-6-astra', [{'id': 'fastMode', 'value': 'yes'}])]
+        for args in bad:
+            with self.assertRaises(ValueError, msg=args):
+                t3.validate_selection(PROVIDERS, *args)
+
+    def test_workspace_strategy(self):
+        self.assertEqual(t3.workspace_strategy(ns()), {'type': 'root'})
+        self.assertEqual(t3.workspace_strategy(ns(worktree_from='main', branch='t3code/x')),
+                         {'type': 'worktree', 'baseRef': 'main', 'startFromOrigin': True, 'branch': 't3code/x'})
+        self.assertFalse(t3.workspace_strategy(ns(worktree_from='main', no_origin=True))['startFromOrigin'])
+        self.assertEqual(t3.workspace_strategy(ns(existing_worktree='/w')),
+                         {'type': 'existing_worktree', 'worktreePath': '/w'})
+        with self.assertRaises(ValueError):
+            t3.workspace_strategy(ns(worktree_from='main', existing_worktree='/w'))
+
+    def test_summarize_and_started(self):
+        projection = {'thread': {'id': 't', 'title': 'T', 'branch': 'b'},
+                      'runs': [{'status': 'completed', 'startedAt': 'x', 'completedAt': 'y'}],
+                      'messages': [{'role': 'user', 'text': 'hi'}, {'role': 'assistant', 'text': 'hello'}]}
+        s = t3.summarize(projection)
+        self.assertEqual((s['threadId'], s['lastAssistantMessage'], s['run']['status']), ('t', 'hello', 'completed'))
+        self.assertTrue(t3.started(s))
+        self.assertFalse(t3.started(t3.summarize({'thread': {}, 'runs': [], 'messages': []})))
+        self.assertFalse(t3.started({'run': {'status': 'waiting', 'startedAt': None}}))
+
+    def test_check_origin(self):
+        t3.check_origin('http://127.0.0.1:3773', False)
+        t3.check_origin('http://100.124.111.25:8789', True)
+        for origin, allow in (('http://100.124.111.25:8789', False), ('http://127.0.0.1:3773/x', True),
+                              ('ftp://127.0.0.1', True)):
+            with self.assertRaises(ValueError, msg=origin):
+                t3.check_origin(origin, allow)
+
+
+class RemoteTests(unittest.TestCase):
+    def test_remote_forwards_args_and_inlines_prompt_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = Path(tmp, 'task.txt')
+            task.write_text("quote ' $(rm -rf /) \n line2", encoding='utf-8')
+            argv = ['--host', 'office', '--base-dir', '~/.t3code', '--allow-non-loopback', 'start',
+                    '--project', 'devops', '--title', 'T', '--request-id', 'r1', '--prompt-file', str(task),
+                    '--provider', 'codex', '--model', 'gpt-6-astra']
+            args = t3.build_parser().parse_args(argv)
+            seen = {}
+
+            def fake_run(cmd, input, **kw):
+                seen['cmd'], seen['payload'] = cmd, json.loads(input)
+                return type('R', (), {'returncode': 0, 'stdout': '{"ok": true}', 'stderr': ''})()
+
+            with patch('subprocess.run', fake_run):
+                self.assertEqual(t3.run_remote(args, argv), {'ok': True})
+        forwarded = seen['payload']['args']
+        self.assertNotIn('--host', forwarded)
+        self.assertNotIn('--prompt-file', forwarded)
+        self.assertEqual(forwarded[forwarded.index('--prompt') + 1], task.read_text() if task.exists() else
+                         "quote ' $(rm -rf /) \n line2")
+        self.assertEqual(seen['cmd'][:6], ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '--'])
+        self.assertEqual(seen['cmd'][6], 'office')
+        self.assertNotIn('rm -rf', seen['cmd'][7])
+
+    def test_rejects_ssh_options_as_host(self):
+        argv = ['--host=-oProxyCommand=x', 'inspect']
+        with self.assertRaises(ValueError):
+            t3.run_remote(t3.build_parser().parse_args(argv), argv)
 
 
 if __name__ == '__main__':

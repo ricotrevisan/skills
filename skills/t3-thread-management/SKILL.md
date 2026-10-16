@@ -1,123 +1,74 @@
 ---
 name: t3-thread-management
-description: Create and start T3Code threads locally or on another server over SSH, with task handoffs and isolated worktrees, or check their status. Use when the user asks to start a new T3 session, hand work to another server, or split work across T3 threads.
+description: Start, check, or find T3 Code threads on lab, office, or this machine through the server's V2 orchestration API. Use when the user asks to start a T3 session, hand work to another server, split work across T3 threads, or check a thread's status.
 ---
 
 # T3 thread management
 
-T3 threads can be started on a headless server: obtain short-lived authentication
-with the T3 CLI, then call the running server's orchestration API. A missing MCP
-thread tool or `t3` executable on PATH does not establish that access is unavailable.
-`t3 app <path>` instead talks to a desktop app on the same machine; its failure
-does not rule out the headless route.
-For a direct CLI/API example without the helper, read
-[references/direct-api.md](references/direct-api.md). The native CLI has no prompt
-submission subcommand; do not invent a `t3 --prompt` or `t3 session create` flag.
+T3 Code 0.1.0 servers run orchestration protocol 2. One server call,
+`orchestration.launchThread`, creates the thread, prepares its workspace (root,
+an existing worktree, or a new worktree from a base ref), and sends the first
+message. The bundled helper wraps it: standard-library Python 3.9+, auth from the
+destination's own `t3` CLI (five-minute token, `orchestration:read` +
+`orchestration:operate`), WebSocket RPC for writes, HTTP for reads.
 
-## Prepare the handoff
+Run `scripts/t3_threads.py --help` (and `<subcommand> --help`) for flags. Global
+options precede the subcommand.
 
-1. Use the user's requested repository. Read its instructions and inspect Git
-   status. For concurrent work on an existing repo, fetch the intended base and
-   create a dedicated branch/worktree. Preserve other checkouts. For a new project,
-   create the requested directory; the receiving agent can initialize the repo.
-2. Write a UTF-8 prompt file containing the concrete objective, source/reference
-   paths, assigned worktree and branch, scope ownership, applicable instructions,
-   verification requirements, and expected deliverables. Carry forward the user's
-   actual authorization; a new thread gains no additional merge/release permissions.
-3. Select the source T3 thread ID from the current context or the helper's
-   `inspect` output. The helper inherits its model selection and runtime mode.
-   This does not copy conversation history: include needed facts in the prompt.
+## Servers
 
-## Create and verify
+| Target | Invocation prefix |
+| --- | --- |
+| this machine | `t3_threads.py` (base `~/.t3`) |
+| lab | `t3_threads.py --host lab` |
+| office (Mac mini) | `t3_threads.py --host office --base-dir '~/.t3code' --allow-non-loopback` |
 
-Use the bundled standard-library Python helper. It discovers the server from
-`~/.t3/userdata/server-runtime.json` and checks PATH and `~/.t3/runtime/versions/`
-for a CLI. Override `--base-dir` or `--cli` when necessary; a built source checkout
-can be invoked with `--cli /path/to/apps/server/dist/bin.mjs`.
-Use `--node /path/to/node` if Node is absent from PATH. These connection options
-precede the `inspect`, `start`, or `status` subcommand.
+`--host` streams the helper to `python3` on the destination over SSH; auth is
+issued and used there. Paths in `--existing-worktree` and `--project` (when a
+path) are destination paths; `--prompt-file` is read locally and sent as text.
 
-```bash
-python3 <skill-dir>/scripts/t3_threads.py inspect
+## Launch
 
-python3 <skill-dir>/scripts/t3_threads.py start \
-  --source-thread <current-thread-id> \
-  --workspace /absolute/project/root \
-  --title 'Concrete task title' \
-  --prompt-file /absolute/task.txt \
---receipt /absolute/task-thread.json
+1. **Prompt file.** Write a UTF-8 task file: objective, source paths, scope,
+   applicable instructions, verification, deliverables. Carry forward the user's
+   actual authorization; a new thread gains no merge/deploy permission. Include
+   needed facts; history is not copied.
+2. **Request ID.** Choose a stable ID per requested thread (originating message
+   or task). The helper derives the server `commandId` from it, so re-sending the
+   same request returns the same thread with `"resumed": true` and starts nothing
+   new. Keep it for every retry and status check.
+3. **Inspect.** `inspect --models` lists provider instances with status, model
+   slugs, and option values. Pick a `ready` provider. Use those exact slugs and
+   option ids (Codex `reasoningEffort`/`serviceTier`, Claude `effort`, ACP agents
+   report their own). `--source-thread` inherits model and runtime mode instead.
+4. **Dry run.** `start ... --dry-run` resolves the project (id, exact title, or
+   workspace root; `--add-project` registers a missing path) and validates the
+   selection against the live server. Fix every error it reports.
+5. **Start.** Same arguments without `--dry-run`. Workspace: default is the
+   project root; `--worktree-from main --branch t3code/<task>` has the server
+   fetch and create the worktree from `origin/main` (`--no-origin` for the local
+   ref); `--existing-worktree PATH` attaches one. Defaults: `--runtime-mode
+   full-access`, `--interaction-mode default`, `--wait started`.
+6. **Verify.** Done when the output shows `waitSatisfied: true` and a run with
+   `startedAt` (or `--wait completed` and a terminal run status), plus the
+   expected `branch`/`worktreePath`. Report server, project, title, thread ID,
+   branch/worktree, and run state. If the wait timed out, say so and poll
+   `status --thread-id`.
 
-python3 <skill-dir>/scripts/t3_threads.py status --thread-id <new-thread-id>
-```
+For an empty thread (phone handoff), use `--no-message`; workspace setup is still
+performed by the server.
 
-For a short task, replace `--prompt-file` with `--prompt 'say hello'`.
+## Recovery
 
-For an existing project with a separate worktree, supply the original project root
-as `--workspace`, plus `--branch <branch>` and `--worktree /absolute/worktree`.
-The helper attaches an already prepared worktree; it does not create branches.
+- Timeout, SSH drop, or unclear outcome: re-run the identical `start` (same
+  request ID). `resumed: true` means it had landed; read `status`.
+- `Provider ... is error/disabled`: the provider needs attention in Settings →
+  Providers on that server. Report it; choose another provider only if the user
+  agrees.
+- `WebSocket upgrade refused ... 426`: the server is not on protocol 2.
+- Smoke tests: `delete --thread-id` removes the thread only. Remove its worktree
+  and branch with `git worktree remove` / `git branch -D` after confirming they
+  hold no changes.
 
-Use one receipt per requested thread. It records IDs and completed dispatch stages,
-never credentials. Re-running the same request with that receipt reads status
-without submitting another turn. A changed request with the same receipt fails.
-
-After dispatch, check status until there is evidence of a started turn (a running
-session, an active turn ID, or a completed turn/message). An accepted command alone
-is not proof that the agent started. Report the project, thread title/ID, worktree,
-and observed status. If startup remains pending or fails, report it accurately.
-
-## Another server over SSH
-
-Put `--host office` before the subcommand. The helper streams its code and the
-prompt over SSH to Python 3 on the destination; no remote skill installation is
-required. SSH uses batch mode and the existing host-key policy. Configure SSH
-access when necessary rather than disabling host verification.
-
-```bash
-python3 <skill-dir>/scripts/t3_threads.py --host office inspect
-python3 <skill-dir>/scripts/t3_threads.py --host office start \
-  --source-thread <office-thread-id> \
-  --workspace /path/on/office/project \
-  --title 'Greeting' --prompt 'say hello' \
-  --receipt /path/on/office/greeting-thread.json
-```
-
-`--prompt-file` is read on the invoking machine and sent as text. Workspace,
-worktree, receipt, CLI, Node and base-directory paths belong to the destination.
-The destination uses its own T3CODE_HOME/default when `--base-dir` is omitted;
-the invoking machine's environment is not forwarded. Source thread IDs must exist
-on the destination: choose one from its `inspect` output. Authentication is issued
-and used there; tokens never travel back in the SSH payload or result.
-
-Prepare branches/worktrees on the destination before starting. The helper does
-not transfer repositories or uncommitted files. Describe needed files in the
-handoff and explicitly transfer them within the user's scope.
-
-An SSH disconnect can occur after a successful API write. The receipt lives on
-the destination; re-run with the same host, request and receipt to inspect it.
-Use `--host office status --thread-id <id>` to verify startup.
-
-If a machine uses a different layout, inspect its launcher/runtime file and pass
-the actual `--base-dir`, `--cli` and `--node`. Some servers bind only to a LAN or
-Tailnet IP. After verifying that the destination owns the runtime file's address,
-pass `--allow-non-loopback`; it uses that configured origin with redirects disabled.
-
-## Failure recovery
-
-- Authentication stays in memory and expires after five minutes. The helper uses
-  the loopback runtime origin by default, with redirects disabled. The explicit
-  non-loopback override is for a verified destination-owned server address.
-- After a timeout or error, inspect the receipt and server status. Keep the same
-  IDs; do not delete the receipt and blindly retry. If creation/start did not land,
-  inspect the current API contract before explicitly resuming that stage.
-- On CLI/schema mismatch, check the installed CLI's `--help` and local T3 source:
-  `apps/server/src/cli/project.ts`, `packages/contracts/src/`, and orchestration
-  routes. The successful flow is project.create (if missing), thread.create, then
-  thread.turn.start through `/api/orchestration/dispatch`; read state through
-  `/api/orchestration/snapshot`. Use the live API for writes, not SQLite edits.
-- If the helper finds an existing active thread with the same project and title,
-  inspect it before choosing reuse or a distinct title. Never start duplicate work
-  merely to recover from an uncertain response.
-
-Creating, starting, or steering a thread must be within the user's requested work.
-Use this workflow for actual T3 sessions; ordinary in-turn subagents are a separate
-capability.
+Find past threads with `search --query` (message text). Wire-level details for
+writing another client are in [references/protocol.md](references/protocol.md).
