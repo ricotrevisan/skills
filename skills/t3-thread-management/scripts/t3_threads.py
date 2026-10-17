@@ -277,11 +277,23 @@ def workspace_strategy(args):
         raise ValueError('Use either --worktree-from or --existing-worktree.')
     branch = {'branch': args.branch} if args.branch else {}
     if args.worktree_from:
+        if args.worktree_from == 'default':
+            raise ValueError('--worktree-from default must be resolved against the project root first.')
         return {'type': 'worktree', 'baseRef': args.worktree_from,
                 'startFromOrigin': not args.no_origin, **branch}
     if args.existing_worktree:
         return {'type': 'existing_worktree', 'worktreePath': args.existing_worktree, **branch}
     return {'type': 'root', **branch}
+
+
+def default_branch(root):
+    """The repository's remote default branch (origin/HEAD), for --worktree-from default."""
+    out = subprocess.run(['git', '-C', root, 'ls-remote', '--symref', 'origin', 'HEAD'],
+                         text=True, capture_output=True, timeout=60)
+    for line in out.stdout.splitlines():
+        if line.startswith('ref: refs/heads/') and line.endswith('\tHEAD'):
+            return line[len('ref: refs/heads/'):-len('\tHEAD')]
+    raise ValueError(f'Could not read origin\'s default branch for {root}; pass --worktree-from REF.')
 
 
 def setup_scripts(project, strategy):
@@ -377,6 +389,8 @@ def cmd_start(client, args, base):
         providers = client.rpc('server.getConfig', {}).get('providers', [])
         selection = validate_selection(providers, args.provider, args.model, parse_options(args.option))
         runtime_mode = args.runtime_mode
+    if args.worktree_from == 'default':
+        args.worktree_from = default_branch(project['workspaceRoot'])
     payload = {
         'commandId': command_id(args.request_id), 'creationSource': 'server',
         'projectId': project['id'], 'title': args.title.strip(), 'modelSelection': selection,
@@ -404,6 +418,55 @@ def cmd_start(client, args, base):
             'waitSatisfied': args.wait == 'none' or prompt is None or (
                 started(summary) if args.wait == 'started'
                 else (summary.get('run') or {}).get('status') in TERMINAL_RUN_STATES)}
+
+
+def wait_for(client, thread_id, wait, timeout, after_ordinal=0):
+    """Poll until the newest run past after_ordinal has started or finished, per --wait."""
+    deadline = time.time() + timeout
+    while True:
+        projection = client.projection(thread_id)
+        runs = [r for r in projection.get('runs') or [] if (r.get('ordinal') or 0) > after_ordinal]
+        summary = summarize({**projection, 'runs': runs})
+        done = wait == 'none' or (runs and (started(summary) if wait == 'started'
+                                            else summary['run']['status'] in TERMINAL_RUN_STATES))
+        if done or time.time() >= deadline:
+            return {**summary, 'waitSatisfied': bool(done)}
+        time.sleep(3)
+
+
+def cmd_send(client, args):
+    text = Path(args.prompt_file).read_text(encoding='utf-8') if args.prompt_file else args.prompt
+    if not text or not text.strip():
+        raise ValueError('Message is empty.')
+    projection = client.projection(args.thread_id)
+    last = max([r.get('ordinal') or 0 for r in projection.get('runs') or []], default=0)
+    command = {'type': 'message.dispatch', 'createdBy': 'user', 'creationSource': 'server',
+               'commandId': command_id(args.request_id), 'threadId': args.thread_id,
+               'messageId': str(uuid.uuid4()), 'text': text, 'attachments': [],
+               'dispatchMode': {'type': 'queue_after_active'}}
+    if args.provider or args.model:
+        if not args.provider or not args.model:
+            raise ValueError('Pass --provider and --model together.')
+        providers = client.rpc('server.getConfig', {}).get('providers', [])
+        command['modelSelection'] = validate_selection(providers, args.provider, args.model,
+                                                       parse_options(args.option))
+    if args.dry_run:
+        return {'dryRun': True, 'command': {**command, 'text': {'chars': len(text)}}}
+    # An interrupt with --hold-queue (T3's Stop) holds the queue; a new message releases it.
+    client.rpc('orchestration.dispatchCommand', {'type': 'queue.resume', 'commandId': str(uuid.uuid4()),
+                                                 'threadId': args.thread_id})
+    client.rpc('orchestration.dispatchCommand', command)
+    return {'sent': True, **wait_for(client, args.thread_id, args.wait, args.timeout, last)}
+
+
+def cmd_interrupt(client, args):
+    runs = client.projection(args.thread_id).get('runs') or []
+    active = [r['id'] for r in runs if r.get('status') not in TERMINAL_RUN_STATES]
+    for run_id in active:
+        client.rpc('orchestration.dispatchCommand', {
+            'type': 'run.interrupt', 'commandId': str(uuid.uuid4()), 'threadId': args.thread_id,
+            'runId': run_id, 'reason': args.reason, 'holdQueue': args.hold_queue})
+    return {'interrupted': active}
 
 
 # --- SSH transport
@@ -459,6 +522,22 @@ def build_parser():
     status.add_argument('--thread-id', required=True)
     delete = commands.add_parser('delete', help='Delete a thread (e.g. a smoke test); leaves its worktree')
     delete.add_argument('--thread-id', required=True)
+    send = commands.add_parser('send', help='Send a follow-up message to an existing thread')
+    send.add_argument('--thread-id', required=True)
+    send.add_argument('--request-id', required=True, help='Stable per message (derives the commandId); reuse it when retrying')
+    body = send.add_mutually_exclusive_group(required=True)
+    body.add_argument('--prompt-file', help='UTF-8 message file on the invoking machine')
+    body.add_argument('--prompt', help='Inline message text')
+    send.add_argument('--provider', help='Switch provider for this turn (with --model)')
+    send.add_argument('--model')
+    send.add_argument('--option', action='append', help='Model option id=value, repeatable')
+    send.add_argument('--wait', choices=['none', 'started', 'completed'], default='started')
+    send.add_argument('--dry-run', action='store_true', help='Validate; send nothing')
+    interrupt = commands.add_parser('interrupt', help="Stop a thread's running turn")
+    interrupt.add_argument('--thread-id', required=True)
+    interrupt.add_argument('--reason', default='Interrupted via t3_threads.py')
+    interrupt.add_argument('--hold-queue', action='store_true',
+                           help="Also hold queued messages (like T3's Stop button)")
     start = commands.add_parser('start', help='Create a thread and send its first message')
     start.add_argument('--project', required=True, help='Project id, exact title, or workspace root')
     start.add_argument('--add-project', action='store_true', help='Register --project path if missing')
@@ -475,7 +554,8 @@ def build_parser():
     start.add_argument('--option', action='append', help='Model option id=value, repeatable')
     start.add_argument('--runtime-mode', choices=['approval-required', 'auto-accept-edits', 'auto', 'full-access'])
     start.add_argument('--interaction-mode', choices=['default', 'plan'], default='default')
-    start.add_argument('--worktree-from', metavar='REF', help='Server creates a new worktree from REF')
+    start.add_argument('--worktree-from', metavar='REF',
+                       help="Server creates a new worktree from REF ('default' = origin's default branch)")
     start.add_argument('--no-origin', action='store_true', help='With --worktree-from: use local REF, not origin/REF')
     start.add_argument('--existing-worktree', metavar='PATH', help='Attach an existing worktree')
     start.add_argument('--branch', help='Branch name for the worktree/root')
@@ -497,7 +577,8 @@ def main(argv=None):
             result = cmd_start(client, args, base)
         else:
             result = {'inspect': cmd_inspect, 'search': cmd_search, 'status': cmd_status,
-                      'delete': cmd_delete}[args.command](client, args)
+                      'delete': cmd_delete, 'send': cmd_send,
+                      'interrupt': cmd_interrupt}[args.command](client, args)
     finally:
         client.close()
     print(json.dumps(result, indent=2))

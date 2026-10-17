@@ -66,3 +66,17 @@ as `thread.archive`, `thread.delete`, `thread.model-selection.set`; each takes
 
 Result: `{threadId, projection, resumed}`. A run's `status` moves through
 `waiting` to `completed`; `startedAt` marks provider startup.
+
+## Follow-ups and stop (`orchestration.dispatchCommand`)
+
+```json
+{"type":"message.dispatch","createdBy":"user","creationSource":"server","commandId":"<uuid>",
+ "threadId":"...","messageId":"<uuid>","text":"...","attachments":[],
+ "dispatchMode":{"type":"queue_after_active"},"modelSelection":{...optional}}
+{"type":"run.interrupt","commandId":"<uuid>","threadId":"...","runId":"<run id>","reason":"...","holdQueue":true}
+{"type":"queue.resume","commandId":"<uuid>","threadId":"..."}
+```
+
+`dispatchMode` is required: `start_immediately`, `queue_after_active`,
+`steer_active`/`restart_active` (with `targetRunId`) or `defer_start`.
+`holdQueue` holds later messages until `queue.resume`.

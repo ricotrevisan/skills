@@ -136,5 +136,27 @@ class RemoteTests(unittest.TestCase):
             t3.run_remote(t3.build_parser().parse_args(argv), argv)
 
 
+
+
+class SendAndDefaultBranchTest(unittest.TestCase):
+    def test_default_branch_from_ls_remote(self):
+        out = 'ref: refs/heads/trunk\tHEAD\nabc123\tHEAD\n'
+        with patch('subprocess.run', return_value=argparse.Namespace(stdout=out)):
+            self.assertEqual(t3.default_branch('/repo'), 'trunk')
+        with patch('subprocess.run', return_value=argparse.Namespace(stdout='')):
+            with self.assertRaises(ValueError):
+                t3.default_branch('/repo')
+
+    def test_unresolved_default_is_rejected(self):
+        args = argparse.Namespace(worktree_from='default', existing_worktree=None, branch=None, no_origin=False)
+        with self.assertRaises(ValueError):
+            t3.workspace_strategy(args)
+
+    def test_send_and_interrupt_parse(self):
+        args = t3.build_parser().parse_args(['send', '--thread-id', 't', '--request-id', 'r', '--prompt', 'hi'])
+        self.assertEqual((args.command, args.wait), ('send', 'started'))
+        args = t3.build_parser().parse_args(['interrupt', '--thread-id', 't', '--hold-queue'])
+        self.assertTrue(args.hold_queue)
+
 if __name__ == '__main__':
     unittest.main()
