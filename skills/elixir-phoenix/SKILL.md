@@ -1,6 +1,6 @@
 ---
 name: elixir-phoenix
-description: Elixir/Phoenix conventions for Rico's projects. Use when setting up or starting work in a Phoenix worktree (`mix setup`), when a Mix or PubSub socket error such as `:eperm` blocks a command, or when editing an Ash resource, domain, or controller.
+description: Elixir/Phoenix conventions for Rico's projects. Use when setting up or starting work in a Phoenix worktree (`mix setup`), when a Mix or PubSub socket error such as `:eperm` blocks a command, when editing an Ash resource, domain, or controller, or when adding or choosing an HTTP client.
 ---
 
 # Elixir / Phoenix
@@ -12,6 +12,13 @@ A project's own `AGENTS.md` holds that app's specifics and overrides anything he
 ## New worktree
 
 In a fresh worktree that contains a Phoenix app, run `mix setup` before development, unless Rico opts out. It installs dependencies and prepares the database; commands run before it fail on missing setup.
+
+## HTTP clients
+
+Use Req for outbound HTTP. Don't add HTTPoison, hackney or Tesla. Req's Mint transport verifies against the OS CA store, so a CA incident is fixed by an image rebuild; hackney pins its own certifi bundle.
+
+- Swoosh: `Swoosh.ApiClient.Req` (or `Finch`).
+- ExAws: `config :ex_aws, http_client: ExAws.Request.Req`.
 
 ## Mix socket errors: `:eperm`
 
