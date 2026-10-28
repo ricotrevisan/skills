@@ -54,6 +54,10 @@ Grade Bubble plugin element usability for junior and senior builders. Includes a
 
 Conventions for Elixir/Phoenix work in Rico's projects: run `mix setup` in a fresh Phoenix worktree, treat a `Mix.PubSub` `:eperm` socket error as the sandbox rather than a permissions bug, and keep Ash controllers thin — data access lives in resource actions and domains, controllers parse → call → render.
 
+### [launch-qa](skills/launch-qa/SKILL.md)
+
+Pre-launch QA with five first-time-user personas (impatient, skeptic, mobile on slow 3G, non-native English speaker, breaker). Each persona runs as a subagent in a real browser and goes from landing page to first success, screenshotting every friction moment. The issues are then merged, ranked by how many personas hit them, and fixed in one pass, and all five rerun to prove the fixes.
+
 ## Install
 
 Clone the repo, then symlink every skill into the directories your agent clients load:
