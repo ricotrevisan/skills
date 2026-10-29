@@ -1,6 +1,6 @@
 ---
 name: tidewave
-description: Use Tidewave MCP tools (project_eval, get_logs, browser_eval, execute_sql_query, get_docs, get_source_location, get_ecto_schemas) against a running Phoenix dev server. Load before calling any Tidewave tool for runtime introspection, log reading, SQL, or driving the app in a real browser. Assumes tidewave >= 0.8.
+description: "Runtime introspection of a running Phoenix dev server through Tidewave MCP: eval, logs, SQL, docs, browser. Load before the first Tidewave tool call."
 ---
 
 # Tidewave MCP (0.8+)

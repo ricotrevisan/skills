@@ -1,11 +1,14 @@
 ---
 name: t3-thread-management
-description: Start, check, or find T3 Code threads on lab, office, or this machine through the server's V2 orchestration API. Use when the user asks to start a T3 session, hand work to another server, split work across T3 threads, or check a thread's status.
+description: Start, message, or check T3 Code threads on lab or office from a shell, through the bundled V2 helper. Use from outside a T3 session, or to reach a T3 server other than your own.
 ---
 
 # T3 thread management
 
-T3 Code 0.1.0 servers run orchestration protocol 2. One server call,
+Inside a T3 session, the T3 Code MCP tools (`t3_thread_launch`, `delegate_task`)
+cover your own server; this skill is for shells and other servers.
+
+T3 Code 0.1.0+ servers run orchestration protocol 2. One server call,
 `orchestration.launchThread`, creates the thread, prepares its workspace (root,
 an existing worktree, or a new worktree from a base ref), and sends the first
 message. The bundled helper wraps it: standard-library Python 3.9+, auth from the
@@ -21,7 +24,7 @@ options precede the subcommand.
 | --- | --- |
 | this machine | `t3_threads.py` (base `~/.t3`) |
 | lab | `t3_threads.py --host lab` |
-| office (Mac mini) | `t3_threads.py --host office --base-dir '~/.t3code' --allow-non-loopback` |
+| office (Mac mini) | `t3_threads.py --host office --allow-non-loopback` |
 
 `--host` streams the helper to `python3` on the destination over SSH; auth is
 issued and used there. Paths in `--existing-worktree` and `--project` (when a

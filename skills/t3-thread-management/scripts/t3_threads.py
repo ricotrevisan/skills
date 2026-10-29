@@ -79,7 +79,7 @@ class Client:
         runtime_file = base / 'userdata/server-runtime.json'
         if not runtime_file.exists():
             raise ValueError(f'{runtime_file} not found: no running server for this base dir. '
-                             'Pass --base-dir (office uses ~/.t3code).')
+                             'Is the T3 server running? Pass --base-dir for a non-default data dir.')
         self.origin = json.loads(runtime_file.read_text())['origin'].rstrip('/')
         self.parsed = check_origin(self.origin, allow_non_loopback)
         argv = discover_cli(base, cli, node) + [
@@ -507,7 +507,7 @@ def run_remote(args, argv):
 def build_parser():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--host', help='SSH destination (lab, office); runs there with its own auth')
-    parser.add_argument('--base-dir', help='T3 data dir on the destination (default $T3CODE_HOME or ~/.t3; office: ~/.t3code)')
+    parser.add_argument('--base-dir', help='T3 data dir on the destination (default $T3CODE_HOME or ~/.t3)')
     parser.add_argument('--cli', help='t3 executable on the destination')
     parser.add_argument('--node', help='Node for a .mjs/.js CLI')
     parser.add_argument('--allow-non-loopback', action='store_true',

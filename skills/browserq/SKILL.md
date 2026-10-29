@@ -1,6 +1,6 @@
 ---
 name: browserq
-description: Standalone browser automation on lab through the browserq admission queue, including Chrome versus Lightpanda selection. Use outside the harness-provided collaborative browser, or when the user explicitly requests another browser or the collaborative preview is unavailable.
+description: Standalone browser automation on lab through the browserq queue. Use when T3's `preview_*` tools are unavailable or the user asks for another browser.
 ---
 
 Follow the host's browser policy. In T3, use the collaborative `preview_*` tools first: check `preview_status`, then `preview_open` if no automation-capable preview is attached. Use another browser only when explicitly requested or `preview_open` reports unsupported/unavailable. Collaborative preview tools do not need a browserq lease.

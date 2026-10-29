@@ -1,6 +1,6 @@
 ---
 name: video-analysis
-description: Analyze videos and screen recordings. Load whenever the user asks to watch, review, explain, or diagnose a video file; prefer Gemini full-duration video input, distinguish it from client-side frame extraction, and troubleshoot the Gemini path before falling back.
+description: Watch, review, explain, or diagnose a video or screen recording.
 compatibility: Native analysis requires Gemini access. The bundled compact-video fallback requires bash, ffmpeg, python3, and GEMINI_API_KEY.
 ---
 

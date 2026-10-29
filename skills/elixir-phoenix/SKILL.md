@@ -1,6 +1,6 @@
 ---
 name: elixir-phoenix
-description: Elixir/Phoenix conventions for Rico's projects. Use when setting up or starting work in a Phoenix worktree (`mix setup`), when a Mix or PubSub socket error such as `:eperm` blocks a command, when editing an Ash resource, domain, or controller, or when adding or choosing an HTTP client.
+description: Rico's Elixir/Phoenix conventions. Use for `mix setup` in a worktree, a Mix `:eperm` socket error, editing an Ash resource, domain, or controller, or choosing an HTTP client.
 ---
 
 # Elixir / Phoenix
