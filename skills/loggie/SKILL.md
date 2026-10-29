@@ -19,6 +19,13 @@ Run `~/.local/bin/loggie-account <account> setup` for the live catalog; treat th
 - work (MocharyMethod): Linear (MocharyMethod), Stripe, PostHog, Defacto, Buildprint Defacto, SavvyCal, Loops, Meetings, Google (Mochary + Search Console), GitHub, Cloudflare, Tailscale
 - unblocklabs: Linear (unblocklabs)
 
+Loops has two teams in the work account. Confirm with `GET /v1/api-key` (`teamName`) before any write:
+
+- `loops`: team "Mochary Method", sends from mocharymethod.com. Coach mail, Defacto v1 transactional templates, and past Defacto update campaigns.
+- `loops-2`: team "Defacto", sends from dfcto.com (DNS in the work Cloudflare zone `dfcto.com`). Defacto v2 transactional email.
+
+Drummer's playbook on `openclaw` (`~/.hermes/skills/operations/external-service-operations/references/defacto-loops-email-operations.md`) covers template ids, consent, suppression, and no-send rules. Read it before any Loops write.
+
 ## Discover and call
 
 1. Run `loggie setup` to obtain the current profile, integration slugs, account labels, readiness, permissions, and routing instructions. Use this live catalog rather than a saved integration list.

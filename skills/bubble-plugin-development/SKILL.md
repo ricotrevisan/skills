@@ -1,6 +1,6 @@
 ---
 name: bubble-plugin-development
-description: Develop, debug, test, and release Bubble.io plugins in `~/bubble-plugins/*` using Pled for plugin source and Buildprint for the dev app. Use for plugin elements or actions, renderer bundles, Bubble branches, demo pages, and preview verification.
+description: "Build, debug, and release Bubble.io plugins in `~/bubble-plugins/*` with Pled: elements, actions, renderer bundles, Bubble branches, demo pages."
 ---
 
 # Bubble plugin development
@@ -54,7 +54,7 @@ Every plugin uses two rico.wtf apps unless its `AGENTS.md` says otherwise:
 - `nocode-to-knowcode` — publicly accessible demo pages. They run released
   versions; update them when a release changes what they show.
   **Buildprint cannot read or change this app** (it is on Bubble's free
-  plan). Change it only in the Bubble editor; see
+  plan). Use Bubble's official MCP to update it; see
   [Public demo pages](#public-demo-pages).
 
 The active profile in `~/.buildprint/auth.json` is shared by every session on
@@ -64,10 +64,21 @@ list` lacks the profile you need, stop and ask the user to create it.
 
 ## Public demo pages
 
-Small edits to `nocode-to-knowcode` (text, links, page settings, a redirect
-workflow) go straight into its Bubble editor in the browser.
+Keep Buildprint as the default for app changes it supports. For free apps
+such as `nocode-to-knowcode`, prefer Bubble's official MCP for inspection and
+updates. Inspect the connected tools' schemas and confirm the exact app,
+page and version before writing; use the Bubble editor only for operations
+the MCP does not support.
 
-Build new demo sections in `tiptap-plugin`, then copy them over:
+The same rollback, authorization and immediate-confirmation rules apply to
+MCP and editor changes. If the free app has no feature-branch capacity,
+obtain explicit confirmation immediately before changing `test` or `live`.
+Verify the changed page in real run mode; an MCP success is not UI evidence.
+Buildprint workspace checks apply only where a Buildprint workspace exists;
+inspect affected references through the MCP/editor for free-app removals.
+
+New demo sections can be built directly through Bubble's MCP. When developing
+and testing them with Buildprint in `tiptap-plugin` first, copy them over:
 
 1. Build each section as one group on a `tiptap-plugin` feature branch with
    Buildprint, and verify it there with real clicks and typing.
@@ -76,7 +87,8 @@ Build new demo sections in `tiptap-plugin`, then copy them over:
    `nocode-to-knowcode` page.
 3. Verify the public page in run mode with real clicks.
 
-Design sections so the paste is clean:
+For either route, use the released plugin install. For copied sections,
+design so the paste is clean:
 
 - Build demo sections with the released install, not the Testing one. The
   Testing install's elements reference `<plugin_id>_dev`, which does not
@@ -134,8 +146,9 @@ repository instructions as well.
    before editing. If Pled reports divergence, understand both sides and
    preserve intentional local and remote work.
 2. For development-app changes, use a short dedicated Bubble branch derived
-   from `test`. Never edit `test` or `live` directly. Bubble allows nine branch
-   copies under `test`; check capacity before creating one.
+   from `test`. Never edit `test` or `live` directly. The app's plan caps branch
+   copies under `test` (10 for `tiptap-plugin` and `mm-137`; Bubble MCP
+   `get_app_plan_context` reports `maxBranches`); check capacity before creating one.
 3. Change plugin behavior in `src/`. Change a separately bundled runtime in
    `lib/`, respecting its pinned Node version and repo-specific build commands.
 4. Run the narrow tests first, then the repo's full relevant build/test suite.
