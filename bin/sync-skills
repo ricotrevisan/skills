@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Build this host's skill folder: ~/.agents/skills, with ~/.claude/skills -> it.
+# Every managed skill is a symlink into a git checkout, so `git pull` updates it.
+#   sync-skills          sync this host
+#   sync-skills --fleet  from lab: copy ~/.agents/AGENTS.md to office and openclaw, then sync all three
+set -euo pipefail
+
+FLEET=(office openclaw)
+LAB_ONLY=(browserq)            # need a lab-only service
+MATT_SETS=(engineering productivity)
+MATT_REPO=https://github.com/mattpocock/skills.git
+
+REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+if [[ ${1:-} == --fleet ]]; then
+  "$0"
+  for h in "${FLEET[@]}"; do
+    echo "== $h"
+    scp -q ~/.agents/AGENTS.md "$h:.agents/AGENTS.md"
+    ssh "$h" 'for r in ~/skills ~/dev/skills; do [ -x $r/bin/sync-skills ] && git -C $r pull -q --ff-only && exec $r/bin/sync-skills; done; echo "no skills checkout"; exit 1'
+  done
+  exit 0
+fi
+
+A=~/.agents/skills C=~/.claude/skills
+B=~/.agents/backups/sync-skills-$(date +%Y%m%dT%H%M%S)
+backup() { mkdir -p "$B"; mv "$1" "$B/$2"; echo "  backed up $1"; }
+host=$(hostname -s)
+mkdir -p "$A"
+
+# 1. Sources
+git -C "$REPO" pull -q --ff-only || echo "  warn: $REPO not fast-forwarded"
+M=~/.agents/mattpocock-skills
+if [ -d "$M/.git" ]; then git -C "$M" pull -q --ff-only || echo "  warn: $M not fast-forwarded"
+elif [ -d "$A/matt_pocock/.git" ]; then mv "$A/matt_pocock" "$M"; git -C "$M" pull -q --ff-only || true
+else git clone -q "$MATT_REPO" "$M"; fi
+
+# 2. Wanted links: name -> target
+declare -A want
+for d in "$REPO"/skills/*/; do
+  n=$(basename "$d"); [[ $host != lab && " ${LAB_ONLY[*]} " == *" $n "* ]] && continue
+  want[$n]=${d%/}
+done
+for s in "${MATT_SETS[@]}"; do for d in "$M"/skills/$s/*/; do [ -f "$d/SKILL.md" ] && want[$(basename "$d")]=${d%/}; done; done
+[ -f ~/.local/share/bubble-graph/skill/SKILL.md ] && want[bubble-graph]=$(cd ~/.local/share/bubble-graph/skill && pwd)
+
+# 3. Fold ~/.claude/skills into ~/.agents/skills, then link it
+if [ -d "$C" ] && [ ! -L "$C" ]; then
+  for e in "$C"/* "$C"/.[!.]*; do
+    [ -e "$e" ] || [ -L "$e" ] || continue; n=$(basename "$e")
+    case $n in synced|.trash) backup "$e" "claude-$n"; continue;; esac
+    if [ -n "${want[$n]:-}" ] || [ -e "$A/$n" ]; then backup "$e" "claude-$n"
+    else mv "$e" "$A/$n"; echo "  moved claude-only $n"; fi
+  done
+  rmdir "$C"
+fi
+[ -L "$C" ] || { mkdir -p ~/.claude; ln -s "$A" "$C"; }
+
+# 4. Link wanted skills, replacing stale copies; drop dangling links
+for n in "${!want[@]}"; do
+  t=$A/$n
+  if [ -e "$t" ] && [ ! -L "$t" ]; then backup "$t" "agents-$n"; fi
+  ln -sfn "${want[$n]}" "$t"
+done
+for l in "$A"/*; do [ -L "$l" ] && [ ! -e "$l" ] && { echo "  removed dangling $(basename "$l")"; rm "$l"; }; done
+
+echo "$host: ${#want[@]} managed skills$( [ -d "$B" ] && echo ", backups in $B")"
