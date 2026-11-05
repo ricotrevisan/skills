@@ -17,7 +17,7 @@ if [[ ${1:-} == --fleet ]]; then
   for h in "${FLEET[@]}"; do
     echo "== $h"
     scp -q ~/.agents/AGENTS.md "$h:.agents/AGENTS.md"
-    ssh "$h" 'for r in ~/skills ~/dev/skills; do [ -x $r/bin/sync-skills ] && git -C $r pull -q --ff-only && exec $r/bin/sync-skills; done; echo "no skills checkout"; exit 1'
+    ssh "$h" 'for r in ~/skills ~/dev/skills; do [ -d $r/.git ] && git -C $r pull -q --ff-only && exec $r/bin/sync-skills; done; echo "no skills checkout"; exit 1' || echo "  $h FAILED"
   done
   exit 0
 fi
