@@ -24,7 +24,7 @@ options precede the subcommand.
 | --- | --- |
 | this machine | `t3_threads.py` (base `~/.t3`) |
 | lab | `t3_threads.py --host lab` |
-| office (Mac mini) | `t3_threads.py --host office --allow-non-loopback` |
+| office (Mac mini) | `t3_threads.py --host office --base-dir '~/.t3code' --allow-non-loopback` |
 
 `--host` streams the helper to `python3` on the destination over SSH; auth is
 issued and used there. Paths in `--existing-worktree` and `--project` (when a
