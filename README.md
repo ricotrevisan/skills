@@ -78,3 +78,7 @@ for d in skills/*/; do ln -sfn "$PWD/$d" ~/.claude/skills/"$(basename "$d")"; do
 ## License
 
 [MIT](LICENSE)
+
+### [hill-climb-design](skills/hill-climb-design/SKILL.md)
+
+UI/UX hill climb. Each round is its own PR into one root PR. Fresh blind judges from different providers score root against candidate, labelled X/Y in random order, with a reference page, and a walker does the key tasks in a real browser. A kept round squash-merges into the root and a discarded one closes. Screenshots go to an orphan `pr-assets` branch through `scripts/pr-shots`, so they render on private repos. The root PR ends with the final scores and every screen, and Rico merges it.

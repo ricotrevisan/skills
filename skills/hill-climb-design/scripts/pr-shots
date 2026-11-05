@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# pr-shots PREFIX FILE...
+# Commit FILEs under PREFIX/ on the orphan branch `pr-assets` (no checkout, the
+# working tree is untouched), push it, and print one Markdown image per file,
+# pinned to the commit so later pushes never change an old PR's pictures.
+# Run inside the repo the PR belongs to. Never delete `pr-assets`: old PRs link to it.
+set -euo pipefail
+[ $# -ge 2 ] || { sed -n 2,6p "$0"; exit 2; }
+prefix=${1%/}; shift
+repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+idx=$(mktemp -u); trap 'rm -f "$idx"' EXIT
+export GIT_INDEX_FILE=$idx
+for try in 1 2 3; do
+  parent=""
+  if git fetch -q origin "+refs/heads/pr-assets:refs/remotes/origin/pr-assets" 2>/dev/null; then
+    parent=$(git rev-parse refs/remotes/origin/pr-assets)
+    git read-tree "$parent"
+  else
+    git read-tree --empty
+  fi
+  for f; do
+    git update-index --add --cacheinfo "100644,$(git hash-object -w "$f"),$prefix/$(basename "$f")"
+  done
+  commit=$(git commit-tree "$(git write-tree)" ${parent:+-p "$parent"} -m "pr-assets: $prefix")
+  git push -q origin "$commit:refs/heads/pr-assets" && break
+  [ $try = 3 ] && { echo "push to pr-assets failed" >&2; exit 1; }
+done
+for f; do
+  n=$(basename "$f")
+  echo "![${n%.*}](https://github.com/$repo/raw/$commit/$prefix/$n)"
+done
