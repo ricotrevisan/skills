@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: opencode-video VIDEO [PROMPT]
+
+Fallback when Gemini is down: send a compact copy of VIDEO (1 fps, 640 px, mono
+audio) to a video model on OpenCode Go. A 24-minute video costs about $0.03 on
+qwen3.8-flash and takes ~5 min; prefer short clips.
+
+Key: OPENCODE_API_KEY, else `op read "$OPENCODE_OP_REF"`
+     (default op://Dev/Opencode/api_keys/video-analysis).
+
+Optional environment variables:
+  OPENCODE_VIDEO_MODEL  default: qwen3.8-flash
+  OPENCODE_VIDEO_FPS    default: 1
+EOF
+  exit "${1:-2}"
+}
+
+[[ ${1:-} == "-h" || ${1:-} == "--help" ]] && usage 0
+[[ $# -ge 1 && $# -le 2 ]] || usage
+video=$1
+prompt=${2:-"Watch this complete recording. Describe it chronologically with timestamps (mm:ss), including exact actions, visible state changes, and what is said. Separate direct observations from inference."}
+[[ -f "$video" ]] || { echo "Video not found: $video" >&2; exit 1; }
+
+if [[ -z "${OPENCODE_API_KEY:-}" ]]; then
+  ref=${OPENCODE_OP_REF:-op://Dev/Opencode/api_keys/video-analysis}
+  OPENCODE_API_KEY="$(op read "$ref" 2>/dev/null || true)"
+  [[ -n $OPENCODE_API_KEY ]] || { echo "No OpenCode key: set OPENCODE_API_KEY or create $ref" >&2; exit 1; }
+  export OPENCODE_API_KEY
+fi
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+env -u OPENCODE_API_KEY ffmpeg -hide_banner -loglevel error -y -i "$video" \
+  -map 0:v:0 -map '0:a:0?' \
+  -vf "fps=${OPENCODE_VIDEO_FPS:-1},scale=640:-2" -c:v libx264 -preset veryfast -crf 32 -pix_fmt yuv420p \
+  -c:a aac -ac 1 -b:a 32k -movflags +faststart "$work/video.mp4"
+
+OC_FILE="$work/video.mp4" OC_PROMPT="$prompt" OC_MODEL="${OPENCODE_VIDEO_MODEL:-qwen3.8-flash}" \
+python3 -I <<'PY'
+import base64, json, os, sys, uuid, urllib.error, urllib.request
+
+data = open(os.environ["OC_FILE"], "rb").read()
+if len(data) > 20 * 1024 * 1024:
+    sys.exit(f"Compact video is {len(data) >> 20} MiB; cut clips with ffmpeg and send those.")
+body = {
+    "model": os.environ["OC_MODEL"],
+    "messages": [{"role": "user", "content": [
+        {"type": "video_url", "video_url": {"url": "data:video/mp4;base64," + base64.b64encode(data).decode()}},
+        {"type": "text", "text": os.environ["OC_PROMPT"]},
+    ]}],
+}
+# OpenCode Go asks clients to name themselves and send a stable session id;
+# Cloudflare rejects Python's default User-Agent (error 1010).
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer " + os.environ["OPENCODE_API_KEY"],
+    "User-Agent": "rico-video-analysis/1.0",
+    "x-opencode-session": "video-analysis-" + uuid.uuid4().hex,
+}
+req = urllib.request.Request("https://opencode.ai/zen/go/v1/chat/completions",
+                             data=json.dumps(body).encode(), headers=headers)
+try:
+    r = json.load(urllib.request.urlopen(req, timeout=900))
+except urllib.error.HTTPError as e:
+    sys.exit(f"OpenCode HTTP {e.code}: {e.read()[:500].decode(errors='replace')}")
+cost = r.get("usage", {}).get("opencode", {}).get("list_cost")
+print(f"[OpenCode Go {os.environ['OC_MODEL']}, list cost ${cost}]", file=sys.stderr)
+print(r["choices"][0]["message"]["content"])
+PY

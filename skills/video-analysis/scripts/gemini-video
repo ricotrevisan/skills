@@ -3,15 +3,19 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-Usage: gemini-video VIDEO [PROMPT]
+Usage: gemini-video VIDEO|YOUTUBE_URL [PROMPT]
 
 Submit a compact, full-duration copy of VIDEO to Gemini, including audio.
+A YouTube URL is passed to Gemini as-is (Gemini fetches it; nothing is downloaded).
+Transient errors (429/5xx, timeouts) retry, then fall back to the next model.
 Requires GEMINI_API_KEY (or an unlocked `op` CLI able to read the Dev vault
 item "Google -  Mochary Method" → section "API keys" → field "Gemini"),
 ffmpeg, and python3.
 
 Optional environment variables:
-  GEMINI_VIDEO_MODEL         Gemini model (default: gemini-3.8-flash)
+  GEMINI_VIDEO_MODELS        Models to try in order
+                             (default: gemini-3.8-flash gemini-3.7-flash gemini-3.6-flash)
+  GEMINI_VIDEO_MODEL         Single model, tried before the list
   GEMINI_VIDEO_FPS           Fallback video frame rate (default: 10)
   GEMINI_VIDEO_HEIGHT        Maximum fallback height (default: 720)
   GEMINI_VIDEO_CRF           H.264 quality value (default: 30)
@@ -25,7 +29,7 @@ EOF
 
 video=$1
 prompt=${2:-"Watch this complete recording. Describe it chronologically with timestamps, including exact actions, visible state changes, audio when relevant, unexpected behavior, and plausible root-cause clues. Separate direct observations from inference."}
-model=${GEMINI_VIDEO_MODEL:-gemini-3.8-flash}
+models="${GEMINI_VIDEO_MODEL:-} ${GEMINI_VIDEO_MODELS:-gemini-3.8-flash gemini-3.7-flash gemini-3.6-flash}"
 fps=${GEMINI_VIDEO_FPS:-10}
 height=${GEMINI_VIDEO_HEIGHT:-720}
 crf=${GEMINI_VIDEO_CRF:-30}
@@ -33,7 +37,12 @@ crf=${GEMINI_VIDEO_CRF:-30}
 # Gemini's 20 MiB inline-request limit.
 inline_limit=${GEMINI_VIDEO_INLINE_LIMIT:-14680064}
 
-[[ -f "$video" ]] || { echo "Video not found: $video" >&2; exit 1; }
+url=
+if [[ $video =~ ^https?://((www|m)\.)?(youtube\.com|youtu\.be)/ ]]; then
+  url=$video
+else
+  [[ -f "$video" ]] || { echo "Video not found: $video" >&2; exit 1; }
+fi
 
 # If no API key is in the environment, resolve the canonical copy from
 # 1Password (Dev vault, item "Google -  Mochary Method", section "API
@@ -49,7 +58,7 @@ fi
   echo "GEMINI_API_KEY is not set (tried op read op://Dev/tuisdffrgbcrrxzpnhyxjlm6oa/API keys/Gemini)" >&2
   exit 1
 }
-command -v ffmpeg >/dev/null || { echo "ffmpeg is required" >&2; exit 1; }
+[[ -n $url ]] || command -v ffmpeg >/dev/null || { echo "ffmpeg is required" >&2; exit 1; }
 command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
 
 work=$(mktemp -d)
@@ -58,7 +67,7 @@ compact="$work/video.mp4"
 
 # Preserve the complete timeline and optional audio while reducing upload size.
 # The media parser does not need access to the API credential.
-env -u GEMINI_API_KEY ffmpeg -hide_banner -loglevel error -y \
+[[ -n $url ]] || env -u GEMINI_API_KEY ffmpeg -hide_banner -loglevel error -y \
   -i "$video" \
   -map 0:v:0 -map '0:a:0?' \
   -vf "fps=${fps},scale=1280:${height}:force_original_aspect_ratio=decrease:force_divisible_by=2" \
@@ -67,10 +76,11 @@ env -u GEMINI_API_KEY ffmpeg -hide_banner -loglevel error -y \
   "$compact"
 
 GEMINI_VIDEO_FILE="$compact" \
+GEMINI_VIDEO_URL="$url" \
 GEMINI_VIDEO_PROMPT="$prompt" \
-GEMINI_VIDEO_MODEL="$model" \
+GEMINI_VIDEO_MODELS_RESOLVED="$models" \
 GEMINI_VIDEO_INLINE_LIMIT="$inline_limit" \
-python3 <<'PY'
+python3 -I <<'PY'
 import base64
 import json
 import os
@@ -81,7 +91,8 @@ import urllib.request
 
 video_path = os.environ["GEMINI_VIDEO_FILE"]
 prompt = os.environ["GEMINI_VIDEO_PROMPT"]
-model = os.environ["GEMINI_VIDEO_MODEL"]
+video_url = os.environ["GEMINI_VIDEO_URL"]
+models = list(dict.fromkeys(os.environ["GEMINI_VIDEO_MODELS_RESOLVED"].split()))
 inline_limit = int(os.environ["GEMINI_VIDEO_INLINE_LIMIT"])
 api_key = os.environ["GEMINI_API_KEY"]
 api_root = "https://generativelanguage.googleapis.com"
@@ -89,7 +100,11 @@ api_headers = {"x-goog-api-key": api_key}
 uploaded_name = None
 
 
-def request_json(url, *, data=None, headers=None, method=None, timeout=300):
+class Transient(Exception):
+    pass
+
+
+def request_json(url, *, data=None, headers=None, method=None, timeout=300, transient_ok=False):
     merged_headers = dict(api_headers)
     if headers:
         merged_headers.update(headers)
@@ -105,18 +120,26 @@ def request_json(url, *, data=None, headers=None, method=None, timeout=300):
             return json.loads(body) if body else {}, response.headers
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")
+        if transient_ok and error.code in (429, 500, 502, 503, 504):
+            raise Transient(f"HTTP {error.code}: {detail[:200]}")
         print(f"Gemini HTTP {error.code}: {detail}", file=sys.stderr)
         raise SystemExit(1)
     except Exception as error:
+        if transient_ok:
+            raise Transient(str(error))
         print(f"Gemini request failed: {error}", file=sys.stderr)
         raise SystemExit(1)
 
 
-with open(video_path, "rb") as video_file:
-    video_bytes = video_file.read()
+video_bytes = b""
+if not video_url:
+    with open(video_path, "rb") as video_file:
+        video_bytes = video_file.read()
 
 try:
-    if len(video_bytes) <= inline_limit:
+    if video_url:
+        video_part = {"file_data": {"file_uri": video_url}}
+    elif len(video_bytes) <= inline_limit:
         video_part = {
             "inline_data": {
                 "mime_type": "video/mp4",
@@ -190,12 +213,28 @@ try:
             "maxOutputTokens": 8192,
         },
     }
-    result, _ = request_json(
-        f"{api_root}/v1beta/models/{model}:generateContent",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    result = None
+    for model in models:
+        for attempt, pause in enumerate((15, 45, None), 1):
+            try:
+                result, _ = request_json(
+                    f"{api_root}/v1beta/models/{model}:generateContent",
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                    timeout=900,
+                    transient_ok=True,
+                )
+                break
+            except Transient as error:
+                print(f"[{model} attempt {attempt}: {error}]", file=sys.stderr)
+                if pause:
+                    time.sleep(pause)
+        if result is not None:
+            break
+    if result is None:
+        print("Gemini unavailable on every model; use scripts/opencode-video.", file=sys.stderr)
+        raise SystemExit(3)
 
     try:
         candidate = result["candidates"][0]

@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: yt-fetch captions|video URL OUTDIR
+
+Fetch a YouTube (or other yt-dlp) video's captions or a low-res copy into OUTDIR.
+yt-dlp runs on a home host over SSH, because YouTube bot-checks datacenter IPs.
+
+  captions  OUTDIR/meta.txt, OUTDIR/*.vtt, OUTDIR/transcript.txt ("[mm:ss] text", ~20 s per line)
+  video     OUTDIR/meta.txt, OUTDIR/video.mp4 (<=480p, with audio)
+
+Optional environment variables:
+  VIDEO_FETCH_HOST  SSH host that runs yt-dlp (default: office; openclaw also works).
+                    Runs locally when it equals `hostname -s`.
+EOF
+  exit "${1:-2}"
+}
+
+[[ ${1:-} == "-h" || ${1:-} == "--help" ]] && usage 0
+[[ $# -eq 3 ]] || usage
+mode=$1 url=$2 out=$3
+[[ $mode == captions || $mode == video ]] || usage
+
+host=${VIDEO_FETCH_HOST:-office}
+mkdir -p "$out"
+
+# Runs on the fetch host. yt-dlp@latest because YouTube breaks old versions often;
+# ejs + deno solve YouTube's JS challenge, curl_cffi lets --impersonate chrome mimic
+# Chrome's TLS fingerprint (no browser is opened, no cookies are used).
+remote_script='
+set -uo pipefail
+export PATH=/opt/homebrew/bin:$HOME/.local/bin:$PATH
+mode=$1 url=$2 dir=$3
+cd "$dir"
+yt() { uv tool run --with yt-dlp-ejs --with curl_cffi yt-dlp@latest \
+  --impersonate chrome --remote-components ejs:github --no-playlist \
+  --print-to-file "%(title)s | %(uploader)s | %(duration_string)s | %(webpage_url)s" meta.txt "$@"; }
+if [ "$mode" = captions ]; then
+  # One failed language (often a 429) still exits non-zero; success = any .vtt.
+  yt --skip-download --write-subs --write-auto-subs --sub-langs "en-orig,en,.*-orig" \
+     --sub-format vtt -o subs "$url" >log.txt 2>&1
+  ls *.vtt >/dev/null 2>&1 || { tail -5 log.txt >&2; exit 1; }
+else
+  yt -f "bv*[height<=480]+ba/b[height<=480]/b" --merge-output-format mp4 -o video.mp4 "$url" >log.txt 2>&1 \
+    || { tail -5 log.txt >&2; exit 1; }
+fi
+'
+
+if [[ $host == "$(hostname -s)" ]]; then
+  tmp=$(mktemp -d)
+  bash -c "$remote_script" _ "$mode" "$url" "$tmp"
+  cp "$tmp"/meta.txt "$tmp"/*.vtt "$tmp"/video.mp4 "$out"/ 2>/dev/null || true
+  rm -rf "$tmp"
+else
+  tmp=$(ssh "$host" mktemp -d)
+  trap 'ssh "$host" rm -rf "$tmp"' EXIT
+  ssh "$host" bash -c "$(printf %q "$remote_script")" _ "$mode" "$(printf %q "$url")" "$tmp"
+  if [[ $mode == captions ]]; then
+    scp -q "$host:$tmp/meta.txt" "$host:$tmp/*.vtt" "$out"/
+  else
+    scp -q "$host:$tmp/meta.txt" "$host:$tmp/video.mp4" "$out"/
+  fi
+fi
+
+if [[ $mode == captions ]]; then
+  vtt=$(ls "$out"/*.en-orig.vtt 2>/dev/null || ls "$out"/*.vtt | head -1)
+  python3 -I - "$vtt" "$out/transcript.txt" <<'PY'
+import re, sys
+src, dst = sys.argv[1], sys.argv[2]
+chunks, last, start, buf = [], None, None, []
+cue = None
+for line in open(src, encoding="utf-8"):
+    line = line.strip()
+    m = re.match(r"(\d+):(\d+):(\d+)\.\d+ -->", line) or re.match(r"(\d+):(\d+)\.\d+ -->", line)
+    if m:
+        parts = [int(x) for x in m.groups()]
+        cue = parts[0] * 3600 + parts[1] * 60 + parts[2] if len(parts) == 3 else parts[0] * 60 + parts[1]
+        continue
+    text = re.sub(r"<[^>]+>", "", line).strip()
+    if not text or cue is None or text == last or line.startswith(("WEBVTT", "Kind:", "Language:")):
+        continue
+    last = text
+    if start is None:
+        start = cue
+    buf.append(text)
+    if cue - start >= 20:
+        chunks.append((start, " ".join(buf))); start, buf = None, []
+if buf:
+    chunks.append((start, " ".join(buf)))
+with open(dst, "w", encoding="utf-8") as f:
+    for s, t in chunks:
+        f.write(f"[{s // 60:02d}:{s % 60:02d}] {t}\n")
+print(f"{dst}: {len(chunks)} lines, {sum(len(t.split()) for _, t in chunks)} words")
+PY
+fi
+cat "$out/meta.txt"
