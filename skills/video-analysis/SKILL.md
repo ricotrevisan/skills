@@ -35,7 +35,7 @@ Ask for chronological observations with `mm:ss` timestamps, what is said, and th
 
 | Route | Script | Key |
 |---|---|---|
-| Gemini 3.8 → 3.7 → 3.6 Flash, retries on 429/5xx | `gemini-video` | `GEMINI_API_KEY`, else 1Password `op://Dev/tuisdffrgbcrrxzpnhyxjlm6oa/API keys/Gemini` |
+| Gemini 3.6 → 3.8 → 3.7 Flash, one retry each on 429/5xx | `gemini-video` | `GEMINI_API_KEY`, else 1Password `op://Dev/tuisdffrgbcrrxzpnhyxjlm6oa/API keys/Gemini` |
 | Qwen 3.8 Flash on OpenCode Go (~$0.03 for 24 min) | `opencode-video` | `OPENCODE_API_KEY`, else `op://Dev/Opencode/api_keys/video-analysis` |
 | Frame sampling | ffmpeg stills you inspect | none |
 
