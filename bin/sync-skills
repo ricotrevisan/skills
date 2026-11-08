@@ -2,7 +2,7 @@
 # Build this host's skill folder: ~/.agents/skills, with ~/.claude/skills -> it.
 # Every managed skill is a symlink into a git checkout, so `git pull` updates it.
 #   sync-skills          sync this host
-#   sync-skills --fleet  from lab: copy ~/.agents/AGENTS.md to office and openclaw, then sync all three
+#   sync-skills --fleet  from lab: sync this host, office and openclaw (AGENTS.md ships separately, see ricotrevisan/ops agents/)
 set -euo pipefail
 
 FLEET=(office openclaw)
@@ -16,7 +16,6 @@ if [[ ${1:-} == --fleet ]]; then
   "$0"
   for h in "${FLEET[@]}"; do
     echo "== $h"
-    scp -q ~/.agents/AGENTS.md "$h:.agents/AGENTS.md"
     ssh "$h" 'for r in ~/skills ~/dev/skills; do [ -d $r/.git ] && git -C $r pull -q --ff-only && exec $r/bin/sync-skills; done; echo "no skills checkout"; exit 1' || echo "  $h FAILED"
   done
   exit 0
