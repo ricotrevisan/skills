@@ -1,6 +1,6 @@
 ---
 name: loggie
-description: Access connected services through the Loggie CLI. Use when the user mentions Loggie, or when a task needs an external service integration that is not available through the session's tools; check Loggie's live catalog before concluding access is unavailable.
+description: Access connected services through the Loggie CLI, including Rico's personal Gmail, Google Calendar and Google Drive, Sheets, Docs and Slides. Use when the user mentions Loggie, or when a task needs an external service integration that is not available through the session's tools; check Loggie's live catalog before concluding access is unavailable.
 ---
 
 ## Loggie account routing
@@ -16,6 +16,7 @@ Loggie is available through the shell as `loggie` (fallback: `~/.local/bin/loggi
 Run `~/.local/bin/loggie-account <account> setup` for the live catalog; treat the list below as a hint that Loggie is worth calling, not as the source of truth.
 
 - personal (rico.wtf): Cloudflare, Linear (ricowtf), Coolify, Porkbun, name.com, Buildprint, whoistyping
+- personal Google (rico.trevisan@gmail.com): `google-mail-calendar-personal` (Gmail + Calendar), `google-drive-docs-personal` (Drive, Sheets, Docs, Slides). Path prefixes and OAuth setup: `references/google.md`
 - work (MocharyMethod): Linear (MocharyMethod), Stripe, PostHog, Defacto, Buildprint Defacto, SavvyCal, Loops, Meetings, Google (Mochary + Search Console), GitHub, Cloudflare, Tailscale
 - unblocklabs: Linear (unblocklabs)
 
