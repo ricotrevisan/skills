@@ -8,6 +8,7 @@ set -euo pipefail
 FLEET=(office openclaw)
 LAB_ONLY=(browserq)            # need a lab-only service
 MATT_SETS=(engineering productivity)
+RETIRED=(pr pr-shepherd)       # PR work: Theo's file-pr, babysit-pr, full-send
 MATT_REPO=https://github.com/mattpocock/skills.git
 TSTACK_REPO=https://github.com/t3dotgg/tstack.git   # Theo's skills
 
@@ -47,6 +48,7 @@ done
 for s in "${MATT_SETS[@]}"; do for d in "$M"/skills/$s/*/; do [ -f "$d/SKILL.md" ] && want[$(basename "$d")]=${d%/}; done; done
 for d in "$T"/skills/*/; do n=$(basename "$d"); [ -f "$d/SKILL.md" ] && [ -z "${want[$n]:-}" ] && want[$n]=${d%/}; done
 [ -f ~/.local/share/bubble-graph/skill/SKILL.md ] && want[bubble-graph]=$(cd ~/.local/share/bubble-graph/skill && pwd)
+for n in "${RETIRED[@]}"; do unset "want[$n]"; done
 
 # 3. Fold ~/.claude/skills into ~/.agents/skills, then link it
 if [ -d "$C" ] && [ ! -L "$C" ]; then
@@ -66,6 +68,7 @@ for n in "${!want[@]}"; do
   if [ -e "$t" ] && [ ! -L "$t" ]; then backup "$t" "agents-$n"; fi
   ln -sfn "${want[$n]}" "$t"
 done
+for n in "${RETIRED[@]}"; do [ -L "$A/$n" ] && { echo "  removed retired $n"; rm "$A/$n"; }; done
 for l in "$A"/*; do [ -L "$l" ] && [ ! -e "$l" ] && { echo "  removed dangling $(basename "$l")"; rm "$l"; }; done
 
 echo "$host: ${#want[@]} managed skills$( [ -d "$B" ] && echo ", backups in $B")"

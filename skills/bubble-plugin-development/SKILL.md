@@ -122,11 +122,9 @@ Bubble `secure` shared keys are server-only; element code never receives them.
 
 ## Git PR routing and release boundaries
 
-For plugin source changes that need a GitHub PR, or requests to open, babysit,
-ship through, or resume that PR, read [pr-shepherd](../pr-shepherd/SKILL.md).
-It owns Git PR creation, review/CI polling, evidence-based fixes or questions,
-guarded Git merge, and task-owned Git cleanup. Opening a PR starts that loop;
-it does not finish the task.
+For plugin source changes that need a GitHub PR, open it with `file-pr`, then
+carry it through review and CI with `babysit-pr` (`full-send` when Rico says
+"full send"). Opening a PR starts that loop; it does not finish the task.
 
 Scoped ship-through-PR intent can authorize the eventual **Git merge** once its
 gates pass; opening a PR alone cannot. **Git merge is not Pled push/upload,
@@ -174,8 +172,8 @@ work that is plainly inside an implementation request needs no extra
 confirmation; Pled push/upload still needs the external-change authorization
 above. Bubble/platform merges, releases, branch deletion, and any direct change
 to `test` or `live` require explicit confirmation immediately before they run.
-Git PR merge and task-owned Git cleanup use the scoped-consent rules in
-[pr-shepherd](../pr-shepherd/SKILL.md), without bypassing these platform gates.
+Git PR merge (the merge gate in `babysit-pr`/`full-send`) and worktree cleanup
+(AGENTS.md) never bypass these platform gates.
 
 ## Verification and completion
 
