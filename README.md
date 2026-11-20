@@ -6,6 +6,10 @@ Each skill lives in its own directory under [`skills/`](skills/) and contains a 
 
 ## Skills
 
+### [white-hat-audit](skills/white-hat-audit/SKILL.md)
+
+Passive outsider audit of a website or web app: security headers, TLS, mail records and public data feeds; SEO and AI findability with Lighthouse; and a reader test where seven simulated visitors say what they understood. Two models from other makers fact-check every claim. Ends in a branded, plain-language PDF for the owner (brand config lives outside the repo).
+
 ### [t3-thread-management](skills/t3-thread-management/SKILL.md)
 
 Start T3Code threads with complete task handoffs and prepared worktrees through
