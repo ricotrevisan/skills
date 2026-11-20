@@ -8,7 +8,7 @@ Each skill lives in its own directory under [`skills/`](skills/) and contains a 
 
 ### [white-hat-audit](skills/white-hat-audit/SKILL.md)
 
-Passive outsider audit of a website or web app: security headers, TLS, mail records and public data feeds; SEO and AI findability with Lighthouse; and a reader test where seven simulated visitors say what they understood. Two models from other makers fact-check every claim. Ends in a branded, plain-language PDF for the owner (brand config lives outside the repo).
+Passive outsider audit of a website or web app: security headers, TLS, mail records, forgotten subdomains from certificate logs and public data feeds; whether the privacy notice matches what the site does; SEO and AI findability with Lighthouse and real assistant answers; where the site contradicts itself; a reader test where seven simulated visitors say what they understood; and every screen rebuilt in Paper (phone and laptop, light and dark) with a first design critique. Two models from other makers fact-check every claim. Ends in a branded, plain-language PDF for the owner (brand config lives outside the repo).
 
 ### [t3-thread-management](skills/t3-thread-management/SKILL.md)
 

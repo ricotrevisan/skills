@@ -41,6 +41,12 @@ for pair in pairs:
                 au = a.get(x['id'], {})
                 if au.get('score') is not None and au['score'] < 0.9 and au.get('scoreDisplayMode') in ('binary', 'numeric', 'metricSavings'):
                     print(f"    {c['title']}: {au['title']} {au.get('displayValue', '')}")
+        if f == 'mobile':
+            from urllib.parse import urlsplit
+            host = urlsplit(r['finalDisplayedUrl']).hostname
+            reqs = a.get('network-requests', {}).get('details', {}).get('items', [])
+            outside = sorted({urlsplit(i['url']).hostname for i in reqs if i.get('url', '').startswith('http')} - {host})
+            print(f"    outside origins: {', '.join(outside) or 'none'}")
         html = f'{out}/lighthouse-{name}-{f}-report.html'
         shutil.copy(f'{work}/{name}-{f}-{n}.report.html', html)
         full = f'{work}/{name}-{f}-full.png'
