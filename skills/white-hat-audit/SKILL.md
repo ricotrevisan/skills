@@ -39,13 +39,15 @@ Title, description, canonical, hreflang, `x-default`, robots meta and `X-Robots-
 
 Run Lighthouse in the background while you work: `scripts/lighthouse.sh img name=https://… [name=https://…]` (3 runs × mobile/desktop, median kept, score images cropped, outside origins listed).
 
-**Ask AI assistants.** Write five questions a customer would ask, without naming the site in at least three ("best croissant in Brussels", "how much is a desk near the European Parliament"). Put them to assistants from three makers that search the web: one `delegate_task` each (e.g. Codex GPT, Claude, OpenCode), `role: research`, told to answer as a consumer assistant would, with web search, citing every source. Record per answer: is the site cited, is what it says about the site correct, which competitors appear instead. Methodology states these are models with web search, not the consumer apps.
+**Ask AI assistants.** Write five questions a customer would ask, without naming the site in at least three ("best croissant in Brussels", "how much is a desk near the European Parliament"). Put them to assistants from three makers that search the web: one `delegate_task` each (e.g. Codex GPT, Claude, OpenCode), `role: research`, told to answer as a consumer assistant would, with web search, citing every source. Each assistant must have a working web search tool: a subagent worker may not, and one that only opens URLs it was given tests the site, not its findability; record that per maker. Record per answer: is the site cited, is what it says about the site correct, which competitors appear instead. Methodology states these are models with web search, not the consumer apps.
 
 **Exit:** every item above checked per host, link crawl done, Lighthouse table printed, 15 assistant answers scored.
 
 ## 5. Does the site agree with itself?
 
 Write `ledger.md`: every factual claim the site makes about itself (what it is, who runs it, prices, dates, how to sign up or take part, what happens to data, where it operates, addresses, contact), with the page it appears on, from the home, help, FAQ, privacy, terms, legal pages, `llms.txt` and structured data. Group by topic and mark every topic where two sources disagree, quoting both verbatim.
+
+On a repeat audit, also diff each page's text against the previous run's copy in `raw/`: what the owner already changed decides which findings are fixed, and every earlier finding is re-checked before it is reused.
 
 **Exit:** each listed page read in full, each disagreement quoted with both URLs.
 

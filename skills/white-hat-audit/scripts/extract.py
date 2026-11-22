@@ -3,6 +3,7 @@ import sys, html
 from html.parser import HTMLParser
 SKIP={'script','style','svg','template','noscript','head'}
 VOID={'br','img','input','meta','link','hr','source','wbr','area','col','embed','track'}
+GAP={'span','small','time','abbr','b','strong','em','i','data','output','meter'}
 BLOCK={'p','div','section','li','h1','h2','h3','h4','header','footer','nav','main','article','form','label','button','a','tr','dd','dt','summary','figcaption','blockquote'}
 class P(HTMLParser):
     def __init__(s): super().__init__(convert_charrefs=True); s.stack=[]; s.out=[]; s.cur=''
@@ -26,6 +27,7 @@ class P(HTMLParser):
             t,_=s.stack.pop()
             if t==tag: break
         if tag in BLOCK: s.flush()
+        elif tag in GAP and s.cur and not s.cur.endswith(' '): s.cur+=' '
     def handle_data(s,d):
         if not s.hidden(): s.cur+=d
 p=P(); p.feed(open(sys.argv[1],encoding='utf-8').read()); p.flush()
