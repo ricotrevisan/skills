@@ -17,7 +17,7 @@ Steps 2–5 feed `claims.md`; start the reviewers (step 6), readers (step 7) and
 
 List every host and page type a visitor reaches: apex, `www`, subdomains linked from pages, demo or staging hosts, language versions, login, help/privacy/legal, a content page, a deep page someone would share, public data feeds (`.json`, `llms.txt`, `/.well-known/*`). Follow redirects from `http://` and `https://` on each host, with and without `Accept-Language`, and as Googlebot.
 
-Then the hosts nobody links to: every name in the certificate logs (`curl -sS "https://crt.sh/?q=%25.<domain>&output=json"`, collect `name_value`, note each name's first `not_before`). Resolve each with `dig` (A, AAAA, CNAME). A name that resolves joins the host list; a CNAME pointing at a service that answers "no such site" (an unclaimed bucket, app or page) is a takeover risk. Names from before the current owner's first certificate are history, not findings.
+Then the hosts nobody links to: every name in the certificate logs (`curl -sS "https://crt.sh/?q=%25.<domain>&output=json"`, collect `name_value`, note each name's first `not_before`). Resolve each with `dig` (A, AAAA, CNAME). A name that resolves joins the host list; a CNAME pointing at a service that answers "no such site" (an unclaimed bucket, app or page) is a takeover risk. Names from before the current owner's first certificate are history, not findings. crt.sh can miss live hosts (on one audit it lacked a linked, live subdomain): it adds to the linked-host list, never replaces it.
 
 **Exit:** a page-type list with one URL each, every host's redirect chain, and every certificate-log name marked live, dangling or history.
 
