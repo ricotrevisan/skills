@@ -70,10 +70,10 @@ When they return, re-check every WRONG, every PARTLY and every addition on the l
 ## 8. Screens: fit, rebuild, critique
 
 1. **Fit.** At 320, 390, 768 and 1440 wide, per page type: `document.documentElement.scrollWidth <= window.innerWidth` (agent-browser `set viewport`, then `eval`), plus a screenshot. Tab through the main path from a fresh load: focus always visible, order follows the page, every control reachable and named.
-2. **Rebuild** every public page type in Paper, phone and laptop, light and dark, following [`paper-rebuild.md`](paper-rebuild.md). More than eight page types: rebuild the eight a visitor meets first (home, a landing page, sign-in, a key content page, the deep page people share, help, pricing if any, privacy) and list the rest as not rebuilt.
+2. **Rebuild** every public page type in Paper, phone and laptop, light and dark, following [`paper-rebuild.md`](paper-rebuild.md). Paper runs only on office and the laptop: you capture the screenshots and tokens, an agent there builds, and the exports come back to you. More than eight page types: rebuild the eight a visitor meets first (home, a landing page, sign-in, a key content page, the deep page people share, help, pricing if any, privacy) and list the rest as not rebuilt.
 3. **Critique.** Fill [`design-critique.md`](design-critique.md) → `reading/design-critique.md` and give it to one `delegate_task` on a maker other than the one that built the screens (`role: review`), with the paths to the real and Paper PNGs and the token list; output to `design-critique-result.md`. Check each issue it raises against the real screenshot before it enters the report.
 
-**Exit:** fit and keyboard results per page type, the Paper file URL with every artboard exported, and a critique whose issues are each confirmed or dropped.
+**Exit:** fit and keyboard results per page type, the Paper file URL with every artboard exported to `img/screens/paper/`, and a critique whose issues are each confirmed or dropped.
 
 ## 9. Report
 
