@@ -10,6 +10,10 @@ Each skill lives in its own directory under [`skills/`](skills/) and contains a 
 
 Passive outsider audit of a website or web app: security headers, TLS, mail records, forgotten subdomains from certificate logs and public data feeds; whether the privacy notice matches what the site does; SEO and AI findability with Lighthouse and real assistant answers; where the site contradicts itself; a reader test where seven simulated visitors say what they understood; and every screen rebuilt in Paper (phone and laptop, light and dark) with a first design critique. Two models from other makers fact-check every claim. Ends in a branded, plain-language PDF for the owner (brand config lives outside the repo).
 
+### [competitor-seo-gap](skills/competitor-seo-gap/SKILL.md)
+
+Reverse-engineer competitor SEO from XML sitemaps, DataForSEO Labs (`relevant_pages`, `ranked_keywords`, `historical_search_volume`), and your Google Search Console export via Loggie. Surfaces the ~3% of competitor pages earning search traffic, joins them against your GSC positions, filters out off-product noise, and produces a prioritized content calendar (and optional draft PRs or scheduled publishes).
+
 ### [t3-thread-management](skills/t3-thread-management/SKILL.md)
 
 Start T3Code threads with complete task handoffs and prepared worktrees through
