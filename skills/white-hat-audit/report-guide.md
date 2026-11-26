@@ -36,7 +36,7 @@ The first lines feed the PDF cover; keep them exactly in this shape.
 ## Suggested order of work            (table: When | Task | Who | Effort)
 ---
 ## How we checked (methodology)
-### Models and tools used             (table: Role | AI model | Run in | What it did)
+### Models and tools used             (table: Role | AI model | What it did)
 ---
 *Assembled by <model> on behalf of <preparer>.*
 ```
@@ -84,3 +84,4 @@ On a repeat audit, add `## What changed since <date>` after "The five things": a
 - How the screens were rebuilt (Paper, from screenshots and the site's CSS), what the rebuild left out (photos, icons, missing fonts), which page types were not rebuilt, and which model critiqued them.
 - Reader-test limits: AI simulations, not real people; extraction caveats (e.g. language banners the readers could not see).
 - Limits: no access to hosting, Search Console, analytics or code (unless the owner gave it). Not legal advice when legal topics come up.
+- Keep internal infrastructure out of the report: no hostnames (`lab`, `office`, `Mac mini`), local paths, or orchestration/harness details (`T3`, `pi bridge`, `opencode`, `Antigravity`).
