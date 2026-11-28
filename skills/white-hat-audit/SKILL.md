@@ -9,7 +9,7 @@ You run an outsider's audit: you see only what any browser or crawler sees. Secu
 
 **Passive** means: GET/HEAD requests, DNS, certificate logs, TLS handshakes, reading HTML/JS/JSON, Lighthouse, screenshots, loading pages in a browser without clicking anything that sends data. No POSTs (no login, no form, no email code), no messaging bots, no fuzzing, no brute force, no load. One harmless probe string in a public search box is fine. Owner-only checks (Search Console, logs, code) enter only when the user gives that access.
 
-Work in the current directory: `raw/` for downloads, `reading/` for reader inputs, `personas/` for their answers, `img/` for report images, `claims.md`, `ledger.md`, `<site>-website-report.md` and `.pdf`. Scripts live in this skill's `scripts/`; run downloaded material through Python with `python3 -I`, scripts outside the download dir. Browser work on lab goes through `browserq` (see that skill); plain headless `chromium` is fine for screenshots.
+Work in `~/audits/white-hat/<site>/<yyyy-mm-dd>/` (`raw/` for downloads, `reading/` for reader inputs, `personas/` for their answers, `img/` for report images, `claims.md`, `ledger.md`, `<site>-website-report.md` and `.pdf`). Scripts live in this skill's `scripts/`; run downloaded material through Python with `python3 -I`, scripts outside the download dir. Browser work on lab goes through `browserq` (see that skill); plain headless `chromium` is fine for screenshots.
 
 Steps 2–5 feed `claims.md`; start the reviewers (step 6), readers (step 7) and screen rebuild (step 8) as soon as their inputs exist, and keep working while they run.
 
@@ -49,7 +49,7 @@ Run Lighthouse in the background while you work: `scripts/lighthouse.sh img name
 
 Write `ledger.md`: every factual claim the site makes about itself (what it is, who runs it, prices, dates, how to sign up or take part, what happens to data, where it operates, addresses, contact), with the page it appears on, from the home, help, FAQ, privacy, terms, legal pages, `llms.txt` and structured data. Group by topic and mark every topic where two sources disagree, quoting both verbatim.
 
-On a repeat audit, also diff each page's text against the previous run's copy in `raw/`: what the owner already changed decides which findings are fixed, and every earlier finding is re-checked before it is reused.
+On a repeat audit, also diff each page's text against the previous run's `raw/` under `~/audits/white-hat/<site>/`: what the owner already changed decides which findings are fixed, and every earlier finding is re-checked before it is reused.
 
 **Exit:** each listed page read in full, each disagreement quoted with both URLs.
 
@@ -91,7 +91,11 @@ pdftoppm -r 50 -png <site>-website-report.pdf /tmp/<site>-p   # then tile and lo
 
 Look at every page: cover, page breaks before each Part, tables not split mid-row, images present. Brand (name, logo, preparer contact) comes from `~/.config/white-hat-audit/brand.json`.
 
-**Exit:** every "(point n)" reference resolves, the PDF pages look right, pronouns follow the report guide.
+Archive on `lab` under `~/audits/white-hat/` (if running off `lab`, `scp -rq` the `<yyyy-mm-dd>/` folder to `lab:~/audits/white-hat/<site>/` first):
+- Symlink `~/audits/white-hat/pdfs/<yyyy-mm-dd>-<site>.pdf` → `../<site>/<yyyy-mm-dd>/<site>-website-report.pdf`.
+- Add a row at the top of `~/audits/white-hat/INDEX.md` (date, site, scope, pages, PDF, Markdown, Paper link, notes).
+
+**Exit:** every "(point n)" reference resolves, the PDF pages look right, pronouns follow the report guide, and the run is archived on `lab` with its `pdfs/` symlink and `INDEX.md` row.
 
 ## Reply
 

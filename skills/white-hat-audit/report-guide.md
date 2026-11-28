@@ -41,7 +41,7 @@ The first lines feed the PDF cover; keep them exactly in this shape.
 *Assembled by <model> on behalf of <preparer>.*
 ```
 
-On a repeat audit, add `## What changed since <date>` after "The five things": a two-column table (Was | Now), with each earlier finding marked **Fixed**, **Mostly fixed** or **Still open** (point n), and readers' clarity shown as "before → after". Keep the earlier report's files under a dated name.
+On a repeat audit, add `## What changed since <date>` after "The five things": a two-column table (Was | Now), with each earlier finding marked **Fixed**, **Mostly fixed** or **Still open** (point n), and readers' clarity shown as "before → after". Keep the earlier run intact in its own `<yyyy-mm-dd>/` folder under `~/audits/white-hat/<site>/`.
 
 `---` before a `## Part` heading becomes a page break in the PDF. Point numbers run 1..n through the whole report; after inserting or removing a point, renumber and fix every "(point n)" reference, in "The five things" and in the order-of-work table too.
 
